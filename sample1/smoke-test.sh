@@ -1,4 +1,5 @@
 #!/bin/bash
+# this is a new comment
 set -x
 
 NODE_IP=$(kubectl get nodes -o jsonpath='{ $.items[0].status.addresses[?(@.type=="ExternalIP")].address }')
