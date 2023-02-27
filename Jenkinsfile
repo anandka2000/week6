@@ -6,7 +6,6 @@ podTemplate(containers: [
         args: '30d'
         ),
     ]) {
-
     node(POD_LABEL) {
         stage('Run pipeline against a gradle project') {
             container('gradle') {
@@ -24,22 +23,22 @@ podTemplate(containers: [
                          sh 'printenv'
                          echo "I am the ${env.BRANCH_NAME} branch"
                          echo "Running code coverage"
-			sh '''
-		            pwd
-			    cd sample1
-			    ./gradlew jacocoTestCoverageVerification
-			    ./gradlew jacocoTestReport
-			'''              
-		    }
-                }
 
+			                  sh '''
+		                    pwd
+			                  cd sample1
+			                  ./gradlew jacocoTestCoverageVerification
+			                  ./gradlew jacocoTestReport
+			                  '''              
+		                  }
+                }
                 stage("checkstyle test") {
                     sh '''
                     cd sample1
                     chmod +x gradlew
                     ./gradlew checkstyleMain
                     '''                   
-		}
+		           }
            }
         }
     }
