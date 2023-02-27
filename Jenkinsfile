@@ -17,42 +17,28 @@ podTemplate(containers: [
                     chmod +x gradlew
                     ./gradlew test
                     '''
-                }         
+                }
                 stage("Code coverage") {
-                     if (env.BRANCH_NAME == "feature") {
+                     if (env.BRANCH_NAME == "master") {
                          sh 'printenv'
                          echo "I am the ${env.BRANCH_NAME} branch"
                          echo "Running code coverage"
-                         try {
-				sh '''
-				    pwd
-				    cd sample1
-				    ./gradlew jacocoTestCoverageVerification
-				    ./gradlew jacocoTestReport
-				'''
-			 } catch (Exception E) {
-				echo 'Failure detected'
-			 }
-			 publishHTML (target: [
-				reportDir: 'sample1/build/reports/tests/test',
-				reportFiles: 'index.html',
-				reportName: "JaCoCo Report"
-                    	 ])                       
-		    }
+
+			                  sh '''
+		                    pwd
+			                  cd sample1
+			                  ./gradlew jacocoTestCoverageVerification
+			                  ./gradlew jacocoTestReport
+			                  '''              
+		                  }
                 }
                 stage("checkstyle test") {
                     sh '''
                     cd sample1
                     chmod +x gradlew
                     ./gradlew checkstyleMain
-                    '''
-                    publishHTML (target: [
-                        reportDir: 'sample1/build/reports/checkstyle',
-                        reportFiles: 'main.html',
-                        reportName: "Checkstyle report"
-                    ])                       
-		
-		}
+                    '''                   
+		           }
            }
         }
     }
