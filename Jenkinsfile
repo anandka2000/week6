@@ -38,11 +38,13 @@ podTemplate(yaml: '''
   node(POD_LABEL) {
 
     stage('Build a gradle project') {
-       try {
+       echo "I am the ${env.BRANCH_NAME} branch"
+       
+        try {
           git 'https://github.com/anandka2000/week6.git'
           container('gradle') {
 
-            stage('Build a gradle project') {
+            stage('Build code') {
               sh '''
                   cd sample1
                   chmod +x gradlew
@@ -54,7 +56,6 @@ podTemplate(yaml: '''
             // Run codecoverage test only on master
             stage("Code coverage") {
                 if (env.BRANCH_NAME == "master") {
-                    echo "I am the ${env.BRANCH_NAME} branch"
                     echo "Running code coverage"
                     sh '''
                         pwd
@@ -66,9 +67,8 @@ podTemplate(yaml: '''
             } // stage codecoverage
 
             // Run checkstyle test on master and feature
-            stage("checkstyle test") {
+            stage("Checkstyle test") {
                 if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "feature") {
-                    echo "I am the ${env.BRANCH_NAME} branch"
                     echo "Running checkstyle tests"
                     sh '''
                         cd sample1
@@ -80,7 +80,7 @@ podTemplate(yaml: '''
           } // container gradle
         } catch (Exception E) {
             echo "Build failed"
-            
+            error ('Abortin as build failed')
         } // exception
     } // Stage Build
 
