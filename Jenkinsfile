@@ -107,12 +107,12 @@ podTemplate(yaml: '''
                          echo 'ENTRYPOINT ["java", "-jar", "app.jar"]' >> Dockerfile
                          mv /mnt/calculator-0.0.1-SNAPSHOT.jar .
                     '''
-                    if (env.BRANCH_NAME != "master") {
+                    if (env.BRANCH_NAME == "master") {
                         sh '''   
                             /kaniko/executor --context `pwd` --destination anandka2000/calculator:1.0
                         '''
                     }
-                    else if (env.BRANCH_NAME != "feature") {
+                    else if (env.BRANCH_NAME == "feature") {
                         sh '''   
                             /kaniko/executor --context `pwd` --destination anandka2000/feature-calculator:0.1
                         '''
