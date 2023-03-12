@@ -119,7 +119,7 @@ podTemplate(yaml: '''
                     }
                 } // stage build docker
             } // container kaniko
-        //if not playground
+        }//if not playground
     } // Stage Build Java Image
   } // NODE label
-}
+} // PODTemplate
