@@ -81,7 +81,7 @@ podTemplate(yaml: '''
             // Run test on master and feature
             stage("Unit test") {
                 if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "feature") {
-                    echo "Running checkstyle tests"
+                    echo "Running Unit tests"
                     sh '''
                         cd sample1
                         chmod +x gradlew
