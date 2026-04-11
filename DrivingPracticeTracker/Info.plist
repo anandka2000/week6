@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App identity -->
+    <key>CFBundleDisplayName</key>
+    <string>Driving Tracker</string>
+    <key>CFBundleName</key>
+    <string>DrivingPracticeTracker</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+
+    <!-- Deployment -->
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>armv7</string>
+    </array>
+    <key>MinimumOSVersion</key>
+    <string>16.0</string>
+
+    <!-- Orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- Privacy — required for voice logging -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Microphone access is required for voice logging driving sessions. Your audio is processed on-device and never stored.</string>
+
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Speech recognition is used to transcribe your voice logs into driving session data such as duration, conditions, and supervisor name.</string>
+
+    <!-- Launch screen -->
+    <key>UILaunchScreen</key>
+    <dict/>
+
+    <!-- App Intents: ensure Siri can discover intents without launching the app -->
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <key>IntentsSupported</key>
+            <array>
+                <string>LogDrivingSessionIntent</string>
+                <string>GetDrivingProgressIntent</string>
+            </array>
+        </dict>
+    </dict>
+</dict>
+</plist>
