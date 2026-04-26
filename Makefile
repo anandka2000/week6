@@ -24,7 +24,10 @@ render:
 	cd apps/render && pnpm dev
 
 migrate:
-	@echo "Phase 0: migrations not yet implemented (Day 2)"
+	cd infra && uv run alembic upgrade head
+
+migrate-revision:
+	cd infra && uv run alembic revision --autogenerate -m "$(m)"
 
 test:
 	uv run pytest
@@ -36,7 +39,7 @@ lint:
 	uv run ruff check .
 
 seed:
-	@echo "Phase 0: seed not yet implemented (Day 2)"
+	uv run python scripts/seed_niches.py
 
 e2e-stub:
 	@echo "Phase 0: e2e-stub not yet implemented (Day 6)"
