@@ -1,0 +1,28 @@
+[project]
+name = "shortstack"
+version = "0.1.0"
+description = "AI short-video pipeline (Trending Tech)"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = [
+    "apps/api",
+    "packages/core",
+    "packages/publishers",
+    "workers",
+]
+
+[tool.uv.sources]
+shortstack-core = { workspace = true }
+shortstack-publishers = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "W"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["apps", "packages", "workers"]

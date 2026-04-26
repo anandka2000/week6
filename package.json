@@ -1,0 +1,10 @@
+{
+  "name": "shortstack",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.7.0",
+  "scripts": {
+    "dev:dashboard": "pnpm --filter shortstack-dashboard dev",
+    "dev:render": "pnpm --filter shortstack-render dev"
+  }
+}
