@@ -45,6 +45,15 @@ lint:
 seed:
 	uv run python scripts/seed_niches.py
 
+trends-fetch:
+	uv run python -m shortstack_worker.cli trends fetch --niche $(NICHE)
+
+trends-cluster:
+	uv run python -m shortstack_worker.cli trends cluster --niche $(NICHE)
+
+trends-pick:
+	uv run python -m shortstack_worker.cli trends pick --niche $(NICHE)
+
 e2e-stub:
 	@echo "Phase 0: e2e-stub not yet implemented (Day 6)"
 

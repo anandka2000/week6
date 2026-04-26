@@ -23,6 +23,7 @@ SEEDS = [
             hook_styles=["pattern_interrupt", "curiosity_gap", "contrarian"],
             banned_topics=["politics", "celebrity gossip"],
             cta_template="Follow for one AI workflow per day.",
+            subreddits=["productivity", "getdisciplined", "ChatGPT", "artificial"],
         ),
         "cost_cap_cents": 100,
         "daily_quota": 3,

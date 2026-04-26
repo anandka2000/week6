@@ -14,3 +14,7 @@ class NichePersona(BaseModel):
     )
     banned_topics: list[str] = Field(default_factory=list)
     cta_template: str = Field(default="Follow for more.")
+    subreddits: list[str] = Field(
+        default_factory=list,
+        description="Subreddits used by the Reddit trends fetcher",
+    )

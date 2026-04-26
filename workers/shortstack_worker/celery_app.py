@@ -25,6 +25,7 @@ app = Celery(
     backend=settings.redis_url,
     include=[
         "shortstack_worker.tasks.health",
+        "shortstack_worker.tasks.trends",
     ],
 )
 
