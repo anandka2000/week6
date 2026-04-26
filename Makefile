@@ -18,7 +18,11 @@ dev:
 	wait
 
 worker:
-	@echo "Phase 0: worker not yet implemented (Day 3)"
+	uv run celery -A shortstack_worker.celery_app worker --loglevel=info \
+	    -Q trends,scripts,assets,render,publish,analytics
+
+beat:
+	uv run celery -A shortstack_worker.celery_app beat --loglevel=info
 
 render:
 	cd apps/render && pnpm dev
