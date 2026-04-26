@@ -1,32 +1,44 @@
-# Open questions
+# Open questions & follow-ups
 
-## Phase 1 prerequisites (trends)
-- [ ] Pick subreddit list for `ai-productivity` niche (start: r/productivity, r/getdisciplined, r/artificial, r/ChatGPT?)
-- [ ] Confirm YouTube Data API quota allocation (default 10k units/day — enough?)
-- [ ] Decide pytrends rate limit handling (proxy pool vs. backoff-only)
+## Phase 2 (Sonnet script generation) — start here next
+- [ ] Author `scripts_v1.md` system prompt: persona + hook framework + output JSON shape (matches `ScriptDraft`)
+- [ ] Build `generate_script(trend_id)` Celery task in `workers/shortstack_worker/tasks/scripts.py`
+- [ ] Pydantic re-prompt loop (max 2 retries) on `ValidationError`
+- [ ] Wire `cost_estimate_cents` write on the video row from `estimate_video_cost_cents(draft)`
+- [ ] Reject script if estimate > `cost_hard_cap_cents`
+- [ ] Tests: respx Anthropic, valid + invalid + reprompt-then-valid
 
-## Brand / channel setup
-- [ ] Confirm "Trending Tech" channel naming convention for niche channels
-- [ ] Pick ElevenLabs voice ID for first niche (`ai-productivity`)
-- [ ] Channel art / thumbnail template — does the dashboard need to manage these?
+## Phase 1 follow-ups
+- [ ] YouTube Data API v3 source (`workers/shortstack_worker/sources/youtube.py`) with category 28 filter
+- [ ] Google Trends source via pytrends with backoff
+- [ ] Migrate Reddit fetch from `/hot.json` to PRAW + OAuth before we hit unauth rate limits
+- [ ] Tune Haiku cluster prompt with real outputs; confirm output structure stays stable
 
 ## Cost
-- [ ] Build pricing table in `packages/core/cost.py` (LLM, TTS, image, render) — needs current published rates
-- [ ] Decide stock-relevance score threshold (default 6/10, may need tuning)
-- [ ] Decide what "hero scene only gets Flux" means for scripts with strong scene 0 already covered by stock
+- [ ] Verify all vendor prices in `packages/core/shortstack_core/cost.py` against current rate cards
+- [ ] Decide stock-relevance score threshold (default 6/10) once Phase 3 is in
+- [ ] Add weekly cost rollup to dashboard
 
-## Render
+## Brand / channel
+- [ ] Replace `REPLACE_WITH_ELEVENLABS_VOICE_ID` in seed with the real voice id for `ai-productivity`
+- [ ] Confirm "Trending Tech: <Niche>" naming convention for niche channels
+- [ ] Channel art / thumbnail template — does the dashboard need to manage these?
+
+## Render (Phase 4)
 - [ ] Caption style: word-by-word highlight color, font, max-3-line wrap policy
 - [ ] CTA bar: persistent vs. last-3-seconds-only
-- [ ] Transitions between scenes: hard cut vs. crossfade
+- [ ] Transitions: hard cut vs. crossfade
 
-## Publishing
-- [ ] YouTube category ID for "AI productivity" content (probably 28 — Science & Tech)
-- [ ] Default visibility on first publish: `unlisted` (DoD says yes for v0)
+## Publishing (Phase 5)
+- [ ] YouTube category id (probably 28 - Science & Tech)
+- [ ] Default visibility on first publish: `unlisted` (per DoD)
+- [ ] YouTube `selfDeclaredMadeForKids=false` + synthetic-content disclosure flag baked into the upload payload
 
 ## Approval gate
-- [ ] Auto-approve heuristic thresholds (caption coverage %, audio LUFS range, duration window)
+- [ ] Auto-approve heuristic thresholds (caption coverage %, audio LUFS range, duration window) — Phase 9
 - [ ] After how many consecutive flops do we re-enable manual review?
 
-## Dashboard
-- [ ] Auth — needed for v0? (DoD says no. Keep behind `localhost`.)
+## Infra
+- [ ] CI: pytest + ruff + tsc on PR. Probably GitHub Actions.
+- [ ] Decide whether to swap MinIO for Cloudflare R2 in staging
+- [ ] Backup strategy for postgres in prod

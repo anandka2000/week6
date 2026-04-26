@@ -39,3 +39,31 @@ Same-box deployment. Worker calls `http://localhost:8787/render`. No separate re
 - Storage: MinIO locally; swap to Cloudflare R2 later (S3-compatible).
 - Multi-platform v1: Buffer/Publer API behind a `Publisher` interface.
 - Observability: structlog + OTel-to-stdout. Per-video cost logging is non-negotiable.
+
+## 2026-04-26 — Implementation choices made during week 1
+
+### Enums stored as VARCHAR + CHECK
+SQLAlchemy `Enum(..., native_enum=False)` produces a column-level CHECK
+constraint instead of a Postgres native ENUM type. Trade-off: zero-downtime
+ALTERs on enum value sets are easier this way; the cost is slightly looser
+type info in the DB. Acceptable for v0.
+
+### Reddit via public hot.json (no OAuth) for v0
+We hit `https://www.reddit.com/r/<sub>/hot.json` directly with httpx and a
+polite User-Agent. Trade-off: lower rate limit and no access to subscribed
+listings; but zero auth overhead and trivially testable with respx. PRAW
+migration is in TODO.md.
+
+### CLI uses typer, runs tasks inline (no Celery hop)
+The operator CLI calls `task.run(...)` directly rather than `task.delay(...)`
+so you can drive the trend pipeline without a worker. Real production pulls
+go through beat + workers; the CLI is for ad-hoc.
+
+### Approval gate uses simple status transitions
+`pending_review -> approved` (publish-eligible) and `pending_review -> failed`
+(rejected, with `failure_reason='rejected_in_review'`). No FSM library;
+guarded by a single `_transition` helper in the videos router.
+
+### Same-box render server is a stub for now
+`apps/render` exposes `/health` and a 501 `/render`. Full implementation
+is Phase 4; the server boots in `make dev` so the wiring is correct.
