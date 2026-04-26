@@ -54,8 +54,10 @@ trends-cluster:
 trends-pick:
 	uv run python -m shortstack_worker.cli trends pick --niche $(NICHE)
 
+NICHE ?= ai-productivity
+
 e2e-stub:
-	@echo "Phase 0: e2e-stub not yet implemented (Day 6)"
+	NICHE=$(NICHE) uv run python scripts/e2e_stub.py
 
 clean:
 	docker compose -f infra/docker-compose.yml down -v
