@@ -47,14 +47,27 @@ def test_trend_item_roundtrip():
     assert again.external_id == "abc123"
 
 
+def test_script_valid_minimal():
+    """Sanity: a minimum valid ScriptDraft passes all validators."""
+    draft = ScriptDraft(
+        hook="ok",
+        scenes=_scenes([2.5, 4, 4, 4, 4]),
+        cta="follow",
+        total_duration_sec=18.5,
+        prompt_version="v1",
+        model="claude-sonnet-4-6",
+    )
+    assert draft.scenes[0].index == 0
+
+
 def test_script_hook_word_limit():
     long_hook = " ".join(["word"] * 16)
     with pytest.raises(ValidationError):
         ScriptDraft(
             hook=long_hook,
-            scenes=_scenes([4, 4, 4, 4, 4]),
+            scenes=_scenes([2.5, 4, 4, 4, 4]),
             cta="follow",
-            total_duration_sec=20,
+            total_duration_sec=18.5,
             prompt_version="v1",
             model="claude-sonnet-4-6",
         )
@@ -64,7 +77,7 @@ def test_script_total_duration_must_match():
     with pytest.raises(ValidationError):
         ScriptDraft(
             hook="ok",
-            scenes=_scenes([4, 4, 4, 4]),  # sums to 16
+            scenes=_scenes([2.5, 4, 4, 4]),  # sums to 14.5
             cta="follow",
             total_duration_sec=30,  # disagrees
             prompt_version="v1",
@@ -73,7 +86,7 @@ def test_script_total_duration_must_match():
 
 
 def test_script_indices_must_be_contiguous():
-    bad = _scenes([4, 4, 4, 4])
+    bad = _scenes([2.5, 4, 4, 4])
     bad[2] = Scene(
         index=99, narration="x", on_screen_text="", visual_prompt="x", duration_sec=4
     )
@@ -82,7 +95,7 @@ def test_script_indices_must_be_contiguous():
             hook="ok",
             scenes=bad,
             cta="follow",
-            total_duration_sec=16,
+            total_duration_sec=14.5,
             prompt_version="v1",
             model="claude-sonnet-4-6",
         )
@@ -92,9 +105,41 @@ def test_script_total_duration_cap():
     with pytest.raises(ValidationError):
         ScriptDraft(
             hook="ok",
-            scenes=_scenes([6, 6, 6, 6, 6, 6, 6, 6, 6, 6]),  # 60s
+            scenes=_scenes([2.5, 6, 6, 6, 6, 6, 6, 6, 6, 6]),  # 56.5s, over the 55 cap
             cta="follow",
-            total_duration_sec=60,
+            total_duration_sec=56.5,
+            prompt_version="v1",
+            model="claude-sonnet-4-6",
+        )
+
+
+def test_script_scene_zero_duration_capped_at_3s():
+    with pytest.raises(ValidationError, match="scene 0 duration"):
+        ScriptDraft(
+            hook="ok",
+            scenes=_scenes([4, 4, 4, 4]),  # scene 0 is 4s — too long for the hook
+            cta="follow",
+            total_duration_sec=16,
+            prompt_version="v1",
+            model="claude-sonnet-4-6",
+        )
+
+
+def test_script_scene_zero_narration_capped_at_10_words():
+    scenes = _scenes([2.5, 4, 4, 4])
+    scenes[0] = Scene(
+        index=0,
+        narration=" ".join(["word"] * 11),
+        on_screen_text="",
+        visual_prompt="x",
+        duration_sec=2.5,
+    )
+    with pytest.raises(ValidationError, match="scene 0 narration"):
+        ScriptDraft(
+            hook="ok",
+            scenes=scenes,
+            cta="follow",
+            total_duration_sec=14.5,
             prompt_version="v1",
             model="claude-sonnet-4-6",
         )

@@ -67,3 +67,34 @@ guarded by a single `_transition` helper in the videos router.
 ### Same-box render server is a stub for now
 `apps/render` exposes `/health` and a 501 `/render`. Full implementation
 is Phase 4; the server boots in `make dev` so the wiring is correct.
+
+## 2026-05-01 — Phase 2 (script generation)
+
+### Scene 0 is the hook (≤ 3.0s, ≤ 10 words)
+The `ScriptDraft` validator now enforces both that `scenes[0].duration_sec` is
+≤ 3.0 and that `scenes[0].narration` is ≤ 10 spoken words. This forces the
+hook to actually fit in the first 3 seconds of playback, which is where the
+algorithm decides whether to keep showing the video. Trade-off: more
+reprompt loops on the first batch of scripts; that's fine because it
+narrows what Sonnet can produce.
+
+### CTA is rewritten per video, not copied verbatim
+The cached system prompt instructs Sonnet to rewrite `persona.cta_template`
+to be specific to the current video (≤ 12 words, same intent). Trade-off:
+slightly more variability across videos; expected ~10% engagement uplift
+based on prior data. We keep `cta_template` on the persona as the seed.
+
+### Reprompt sends the validation error back as a user follow-up
+Failed validation -> append assistant's bad output + a user message
+prefixed `VALIDATION_ERROR:` -> call again. The system block is identical,
+so the prompt cache stays warm and we mostly pay for the delta. Capped at
+2 retries (3 calls total) before raising.
+
+### Pre-asset cost estimate runs after generation, not before
+We don't try to project cost without the script (you can't estimate TTS
+char count without scenes). Generation itself is cheap (~1¢ per call) so
+it's cheap to overshoot and reject. The estimate is stamped on
+`videos.cost_estimate_cents`; when it exceeds `niche.cost_cap_cents`
+the video row is created as `status='failed'` with
+`failure_reason='cost_cap_estimate (...)'` rather than ever entering
+`pending_assets`.

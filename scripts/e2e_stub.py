@@ -1,4 +1,4 @@
-"""End-to-end stub: trend → score → pick → stub script + video in pending_review.
+"""End-to-end stub: trend → score → pick → script (Sonnet, when key is set; placeholder otherwise) → review.
 
 Run ``make e2e-stub`` (passes NICHE=ai-productivity by default).
 
@@ -8,10 +8,10 @@ What this proves:
   * niche seeded
   * trend fetcher works (Reddit hot.json)
   * either Haiku is wired up (clusters get scored) OR fallback scoring works
+  * if ANTHROPIC_API_KEY is set: real Sonnet script generation, cost estimate stamped
   * approval gate row is created and visible at /review
 
-What this does NOT do (deferred to later phases):
-  * generate a real script with Sonnet
+What this does NOT do (deferred to Phase 3+):
   * generate assets, audio, captions
   * render an actual mp4
   * publish to YouTube
@@ -28,27 +28,39 @@ from sqlalchemy import select, update
 from shortstack_core.db import Niche, Script, Trend, Video, session_scope
 from shortstack_core.enums import ScriptMode, ScriptStatus, VideoStatus
 from shortstack_core.schemas import Scene, ScriptDraft
+from shortstack_worker.tasks import scripts as script_tasks
 from shortstack_worker.tasks import trends as trend_tasks
 
 NICHE_SLUG = os.environ.get("NICHE", "ai-productivity")
 
 
 def _placeholder_draft(title: str) -> ScriptDraft:
-    """Stub script: 4 scenes of 4s each. Real Sonnet generation is Phase 2."""
+    """Stub script when ANTHROPIC_API_KEY is missing. Real Sonnet path is preferred."""
+    hook = " ".join(title.split()[:12]) or "placeholder hook"
+    scenes = [
+        Scene(
+            index=0,
+            narration="placeholder hook line",
+            on_screen_text="",
+            visual_prompt="placeholder visual",
+            duration_sec=2.5,
+        )
+    ]
+    scenes.extend(
+        Scene(
+            index=i,
+            narration=f"placeholder narration line {i}",
+            on_screen_text="",
+            visual_prompt="placeholder visual",
+            duration_sec=4.0,
+        )
+        for i in range(1, 4)
+    )
     return ScriptDraft(
-        hook=title[:90],
-        scenes=[
-            Scene(
-                index=i,
-                narration=f"placeholder narration line {i}",
-                on_screen_text="",
-                visual_prompt="placeholder visual",
-                duration_sec=4.0,
-            )
-            for i in range(4)
-        ],
+        hook=hook,
+        scenes=scenes,
         cta="Follow for more.",
-        total_duration_sec=16.0,
+        total_duration_sec=14.5,
         prompt_version="stub_v0",
         model="stub",
     )
@@ -67,15 +79,16 @@ def main() -> int:
             return 2
         niche_id = str(niche.id)
 
-    print(f"[1/4] fetch_reddit niche={NICHE_SLUG}")
+    print(f"[1/5] fetch_reddit niche={NICHE_SLUG}")
     fetched = trend_tasks.fetch_reddit.run(niche_id)
     print(f"      wrote {fetched['written']} new trend rows")
 
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        print("[2/4] cluster (Haiku)")
+    have_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    if have_anthropic:
+        print("[2/5] cluster (Haiku)")
         trend_tasks.cluster.run(niche_id)
     else:
-        print("[2/4] ANTHROPIC_API_KEY missing — fallback: hook_score=5 on unscored trends")
+        print("[2/5] ANTHROPIC_API_KEY missing — fallback: hook_score=5 on unscored trends")
         with session_scope() as s:
             s.execute(
                 update(Trend)
@@ -85,7 +98,7 @@ def main() -> int:
                 .values(hook_score=5)
             )
 
-    print("[3/4] pick_next")
+    print("[3/5] pick_next")
     picked = trend_tasks.pick_next.run(niche_id)
     if picked is None:
         print(
@@ -95,30 +108,54 @@ def main() -> int:
         return 3
     print(f"      picked: '{picked['title']}' (score={picked['hook_score']})")
 
-    print("[4/4] create stub script + pending_review video")
+    if have_anthropic:
+        print("[4/5] generate_script (Sonnet)")
+        result = script_tasks.generate_script.run(picked["trend_id"])
+        video_id = uuid.UUID(result["video_id"])
+        print(
+            f"      script_id={result['script_id']} video_id={video_id} "
+            f"est={result['estimate_cents']:.2f}c status={result['status']} "
+            f"attempts={result['attempts']}"
+        )
+    else:
+        print("[4/5] no ANTHROPIC_API_KEY — writing placeholder Script + Video")
+        with session_scope() as s:
+            draft = _placeholder_draft(picked["title"])
+            script = Script(
+                trend_id=uuid.UUID(picked["trend_id"]),
+                niche_id=uuid.UUID(niche_id),
+                mode=ScriptMode.TREND,
+                draft_json=draft.model_dump(),
+                prompt_version="stub_v0",
+                status=ScriptStatus.DRAFT,
+            )
+            s.add(script)
+            s.flush()
+            video = Video(
+                script_id=script.id,
+                niche_id=uuid.UUID(niche_id),
+                status=VideoStatus.PENDING_ASSETS,
+                cost_estimate_cents=0,
+                cost_cents=0,
+            )
+            s.add(video)
+            s.flush()
+            video_id = video.id
+            print(f"      video_id={video_id}")
+
+    # Phases 3-4 (assets, render) aren't implemented yet, so flip pending_assets ->
+    # pending_review here so the demo reaches the approval gate.
     with session_scope() as s:
-        draft = _placeholder_draft(picked["title"])
-        script = Script(
-            trend_id=uuid.UUID(picked["trend_id"]),
-            niche_id=uuid.UUID(niche_id),
-            mode=ScriptMode.TREND,
-            draft_json=draft.model_dump(),
-            prompt_version="stub_v0",
-            status=ScriptStatus.DRAFT,
-        )
-        s.add(script)
-        s.flush()
-        video = Video(
-            script_id=script.id,
-            niche_id=uuid.UUID(niche_id),
-            status=VideoStatus.PENDING_REVIEW,
-            cost_estimate_cents=0,
-            cost_cents=0,
-        )
-        s.add(video)
-        s.flush()
-        print(f"      video_id={video.id}")
-        print(f"      review at: http://localhost:3000/review")
+        v = s.get(Video, video_id)
+        if v is not None and v.status == VideoStatus.PENDING_ASSETS:
+            v.status = VideoStatus.PENDING_REVIEW
+            print(
+                "[5/5] [demo] flipped pending_assets -> pending_review (assets/render are Phase 3-4)"
+            )
+        else:
+            print(f"[5/5] video status={v.status if v else 'missing'} — leaving as-is")
+
+    print("      review at: http://localhost:3000/review")
     return 0
 
 

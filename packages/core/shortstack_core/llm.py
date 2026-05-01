@@ -41,15 +41,18 @@ def get_client() -> Anthropic:
     return _client
 
 
-def call(
+def call_messages(
     *,
     model: str,
     system: str,
-    user: str,
+    messages: list[dict[str, Any]],
     max_tokens: int = 2048,
     cache_system: bool = True,
 ) -> LLMResponse:
-    """Single-turn message. ``system`` is sent with cache_control when ``cache_system``."""
+    """Multi-turn message. ``system`` is sent with cache_control when ``cache_system``
+    so reprompts re-use the cached system block. ``messages`` is the full
+    conversation including the latest user follow-up.
+    """
 
     system_block: list[dict[str, Any]] | str
     if cache_system:
@@ -63,7 +66,7 @@ def call(
         model=model,
         max_tokens=max_tokens,
         system=system_block,
-        messages=[{"role": "user", "content": user}],
+        messages=messages,
     )
 
     text_parts = [b.text for b in msg.content if getattr(b, "type", None) == "text"]
@@ -77,6 +80,24 @@ def call(
         cache_write_tokens=getattr(msg.usage, "cache_creation_input_tokens", 0) or 0,
     )
     return LLMResponse(text=text, usage=usage)
+
+
+def call(
+    *,
+    model: str,
+    system: str,
+    user: str,
+    max_tokens: int = 2048,
+    cache_system: bool = True,
+) -> LLMResponse:
+    """Single-turn convenience wrapper around :func:`call_messages`."""
+    return call_messages(
+        model=model,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        max_tokens=max_tokens,
+        cache_system=cache_system,
+    )
 
 
 _JSON_FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)

@@ -26,6 +26,7 @@ app = Celery(
     include=[
         "shortstack_worker.tasks.health",
         "shortstack_worker.tasks.trends",
+        "shortstack_worker.tasks.scripts",
     ],
 )
 

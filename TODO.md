@@ -1,12 +1,20 @@
 # Open questions & follow-ups
 
-## Phase 2 (Sonnet script generation) — start here next
-- [ ] Author `scripts_v1.md` system prompt: persona + hook framework + output JSON shape (matches `ScriptDraft`)
-- [ ] Build `generate_script(trend_id)` Celery task in `workers/shortstack_worker/tasks/scripts.py`
-- [ ] Pydantic re-prompt loop (max 2 retries) on `ValidationError`
-- [ ] Wire `cost_estimate_cents` write on the video row from `estimate_video_cost_cents(draft)`
-- [ ] Reject script if estimate > `cost_hard_cap_cents`
-- [ ] Tests: respx Anthropic, valid + invalid + reprompt-then-valid
+## Phase 3 (assets) — start here next
+- [ ] Per-scene image generation: Pexels first (relevance graded by Haiku), Flux schnell fallback / hero scene
+- [ ] ElevenLabs Turbo v2.5 TTS with the niche's pinned voice_id
+- [ ] faster-whisper for word-level captions; persist as `CaptionsDoc` JSONB asset
+- [ ] All assets land under `videos/{video_id}/` in MinIO
+- [ ] On any cost_event, abort and mark video failed if rolling cost_cents > niche.cost_cap_cents (hard cap)
+- [ ] Soft-cap warning on the video row (75¢ default) — log + flag, still continue
+- [ ] Asset reuse cache keyed by sha1(visual_prompt + style) per niche
+
+## Phase 2 — done
+- [x] `scripts_v1.md` system prompt with hook framework + scene-0 hook constraint + CTA rewrite
+- [x] `generate_script(trend_id)` Celery task with reprompt loop (max 2 retries)
+- [x] Pre-asset cost estimate stamped on video row, hard-cap fail-fast
+- [x] CLI: `scripts generate --trend-id <uuid>`
+- [x] Tests for prompt builder, validation helper, multi-turn LLM dispatch
 
 ## Phase 1 follow-ups
 - [ ] YouTube Data API v3 source (`workers/shortstack_worker/sources/youtube.py`) with category 28 filter
