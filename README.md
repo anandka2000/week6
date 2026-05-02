@@ -7,6 +7,8 @@ trends  →  cluster + score  →  pick  →  script  →  assets  →  render  
  (1)         (1)               (1)      (2)        (3)       (4)       (5)        (6)
 ```
 
+> **Read [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) first.** It's the canonical operator + developer guide — quick start, every setting, every CLI command, troubleshooting, the lot. This README is just the absolute basics + the phase status board.
+
 ## Quickstart
 
 ```bash
