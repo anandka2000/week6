@@ -509,8 +509,8 @@ make worker   # equivalent to: celery -A shortstack_worker.celery_app worker -Q 
 | **Phase 2: Script gen** | ✅ | Sonnet 4.6 + reprompt loop + scene-0 hook constraint + CTA rewrite |
 | **Phase 3: Assets** | ✅ | Pexels-first / Flux-fallback (Haiku grader) + ElevenLabs Turbo + faster-whisper word timings + rolling cost cap |
 | **Phase 4: Render** | ✅ | Remotion `Vertical` composition (1080×1920, Ken Burns, word-level highlighted captions, fade-in CTA bar). `POST /render` bundles once, renders, uploads mp4 to S3. Worker `render_video(video_id)` task pulls assets, calls render service, records cost, transitions `pending_render → pending_review`. |
-| Phase 5: Publisher | — | YouTube Shorts via OAuth refresh-token; manual approval gates publish |
-| Phase 6: Analytics & feedback | — | Nightly metrics pull + weekly Sonnet "learnings.md" |
+| **Phase 5: Publisher** | ✅ | `Publisher` ABC + `YouTubeShortsPublisher` (OAuth refresh-token → resumable upload). Worker `publish_video(video_id, platform, visibility)` consumes `approved` videos, persists `Publication`, transitions `approved → publishing → published`. Idempotent on `(video_id, platform)`. |
+| **Phase 6: Analytics & feedback** | ✅ | `snapshot_metrics(publication_id)` scheduled at t+24h/72h/7d at publish time, plus nightly catch-up. `weekly_learnings(niche_id)` (Sun 02:00 UTC) reads top vs bottom decile by views-per-cent, Sonnet writes `niches/{id}/learnings_v1.md` to S3. Script-gen system prompt loads it on next run. Dashboard `/metrics` shows views + likes + cost + margin proxy per video. |
 | Phase 7: Multi-platform | — | IG / TikTok / X / LinkedIn via Buffer or Publer API |
 | Phase 8: User-story mode | — | `POST /videos/from-story` skips trends |
 | Phase 9: Full automation | — | Cron + auto-approve heuristic |

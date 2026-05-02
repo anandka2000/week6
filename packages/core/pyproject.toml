@@ -12,6 +12,7 @@ dependencies = [
     "structlog>=24.1",
     "anthropic>=0.40",
     "boto3>=1.34",
+    "httpx>=0.27",
 ]
 
 [build-system]

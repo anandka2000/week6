@@ -52,6 +52,19 @@ export type Video = {
 
 export type DailyCost = { day: string; total_cents: number };
 
+export type VideoMetricRollup = {
+  video_id: string;
+  status: string;
+  external_url: string | null;
+  cost_cents: number;
+  cost_estimate_cents: number;
+  views: number;
+  likes: number;
+  comments: number;
+  captured_at: string | null;
+  views_per_cent: number;
+};
+
 export const listNiches = () => get<Niche[]>("/niches");
 export const listTrends = (slug: string, limit = 50) =>
   get<Trend[]>(`/trends?niche=${encodeURIComponent(slug)}&limit=${limit}`);
@@ -59,3 +72,7 @@ export const listVideos = (slug: string, limit = 50) =>
   get<Video[]>(`/videos?niche=${encodeURIComponent(slug)}&limit=${limit}`);
 export const dailyCosts = (slug: string, days = 30) =>
   get<DailyCost[]>(`/costs/daily?niche=${encodeURIComponent(slug)}&days=${days}`);
+export const metricsByVideo = (slug: string, limit = 50) =>
+  get<VideoMetricRollup[]>(
+    `/metrics/by-video?niche=${encodeURIComponent(slug)}&limit=${limit}`,
+  );

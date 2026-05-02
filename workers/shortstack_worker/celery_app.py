@@ -8,6 +8,7 @@ Tasks live under ``shortstack_worker.tasks``. Each task takes an ID
 from __future__ import annotations
 
 from celery import Celery
+from celery.schedules import crontab
 from kombu import Queue as KombuQueue
 
 from shortstack_core.logging import configure_logging
@@ -63,9 +64,19 @@ app.conf.update(
 )
 
 app.conf.beat_schedule = {
-    # Phase 1+ will populate this. Keeping a marker so beat starts cleanly.
     "ping-every-5m": {
         "task": "shortstack_worker.tasks.health.ping",
         "schedule": 300.0,
+    },
+    # Catch any publication whose latest snapshot is >24h old. Belt-and-suspenders
+    # for the t+24h/72h/7d ETAs scheduled at publish time.
+    "analytics-nightly-catchup": {
+        "task": "shortstack_worker.tasks.analytics.nightly_catchup",
+        "schedule": crontab(hour=2, minute=0),
+    },
+    # Sunday 02:00 UTC: synthesize learnings.md per niche from last week's data.
+    "analytics-weekly-learnings": {
+        "task": "shortstack_worker.tasks.analytics.weekly_learnings_all",
+        "schedule": crontab(day_of_week="sunday", hour=2, minute=0),
     },
 }

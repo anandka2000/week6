@@ -179,6 +179,51 @@ Per YouTube's March-2024 policy. Set on every upload (we always use AI).
 Plain-language disclosure also appended to the description for FTC
 hygiene.
 
+## 2026-05-02 — Phase 6 (analytics + feedback)
+
+### One-shot ETAs at publish time + beat catch-up
+At publish time we `apply_async(eta=...)` three snapshot tasks (t+24h,
+t+72h, t+7d). Beat fires `nightly_catchup` at 02:00 UTC to re-snapshot
+anything whose latest metric is older than 24h. Belt-and-suspenders:
+a worker dying between publish and the t+24h ETA is still covered.
+
+### YouTube Data API only, not Analytics API (yet)
+Data API gives `viewCount`, `likeCount`, `commentCount` from the same
+OAuth scope we use for upload. `avg_view_duration_sec`,
+`retention_curve`, and `ctr` need the *Analytics* API (different
+endpoint + scope `yt-analytics.readonly`). Schema reserves those
+columns; we write zeros for now and fill them in once we have enough
+volume to justify the second OAuth dance. Tracked in TODO.
+
+### Margin proxy = views / cost_cents
+Real margin needs YouTube ad-revenue per video (channel-level only via
+Data API). `views_per_cent` is intent-aligned: high values mean a
+cheap-to-make video with broad reach. Dashboard tints it (≥100 emerald,
+≥20 amber, else neutral) so winners pop.
+
+### Learnings live in S3, not in DB
+`niches/{niche_id}/learnings_v1.md` is overwritten weekly. The prompt
+loader only ever reads the latest; turn on bucket versioning if we
+want to audit drift. Trade-off: no DB join to learnings, but no schema
+work either for what is effectively a single mutable doc per niche.
+
+### Learnings appended *after* the cached system prompt, not prepended
+`system = scripts_v1.md + learnings`. Prepending would invalidate the
+prompt cache on every weekly refresh. Appending keeps the leading
+prefix stable so the most-cached portion is reused; only the trailing
+learnings change weekly.
+
+### Weekly learnings input is JSON, not prose
+Sonnet receives a JSON blob with `top_decile` and `bottom_decile`
+arrays. Easier to compare structurally, deterministic for caching.
+Output is plain markdown so the operator can read
+`niches/{id}/learnings_v1.md` directly.
+
+### `weekly_learnings_all` is a fan-out wrapper
+Beat schedules a single `weekly_learnings_all` that lists active niches
+and fans out one `weekly_learnings` per niche via `apply_async`. New
+niches start getting learnings without touching beat config.
+
 ## 2026-05-02 — Phase 4 (render)
 
 ### Render service is stateless; worker passes everything in the request body

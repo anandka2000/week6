@@ -23,7 +23,7 @@ from shortstack_core.cost import (
 from shortstack_core.db import Niche, Script, Trend, Video, session_scope
 from shortstack_core.enums import ScriptMode, ScriptStatus, VideoStatus
 from shortstack_core.llm import UsageInfo, call_messages, extract_json
-from shortstack_core.prompts import load_prompt
+from shortstack_core.prompts import load_learnings, load_prompt
 from shortstack_core.schemas import NichePersona, ScriptDraft
 
 from ..celery_app import app  # noqa: F401  (ensures app is registered)
@@ -85,6 +85,14 @@ def generate_script(trend_id: str) -> dict[str, Any]:
         cost_cap = niche.cost_cap_cents
 
     system = load_prompt("scripts_v1.md")
+    learnings = load_learnings(niche_id)
+    if learnings:
+        system = (
+            system
+            + "\n\n## Recent learnings from this niche's top performers\n\n"
+            + learnings
+            + "\n\nLet these guide hook style and topic choice."
+        )
     messages: list[dict[str, Any]] = [
         {"role": "user", "content": _user_message(persona, trend_payload)}
     ]

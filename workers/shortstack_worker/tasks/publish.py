@@ -195,12 +195,26 @@ def publish_video(
             v.status = VideoStatus.PUBLISHED
             v.failure_reason = None
 
+    # Schedule t+24h / 72h / 7d metric snapshots. Best-effort — beat-driven
+    # nightly_catchup re-snapshots anything missed if the eta'd tasks are lost.
+    snapshot_task_ids: list[str] = []
+    try:
+        from .analytics import schedule_post_publish_snapshots
+
+        snapshot_task_ids = schedule_post_publish_snapshots(publication_id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "publish.schedule_snapshots_failed",
+            extra={"publication_id": publication_id, "error": str(exc)},
+        )
+
     log.info(
         "publish.done",
         extra={
             "video_id": video_id,
             "publication_id": publication_id,
             "external_id": result.external_id,
+            "snapshot_etas": len(snapshot_task_ids),
         },
     )
     return {
@@ -210,5 +224,6 @@ def publish_video(
         "external_id": result.external_id,
         "external_url": str(result.external_url),
         "visibility": vis.value,
+        "snapshot_task_ids": snapshot_task_ids,
         "next_status": VideoStatus.PUBLISHED.value,
     }

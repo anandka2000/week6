@@ -1,11 +1,26 @@
 # Open questions & follow-ups
 
-## Phase 6 (Analytics + feedback) — start here next
-- [ ] Schedule one-shot `metric_snapshot` ETAs at publish time (t+24h, t+72h, t+7d)
-- [ ] Nightly task `snapshot_metrics(publication_id)` pulls views, avg_view_duration_sec, retention_curve, ctr from YouTube Analytics
-- [ ] Weekly `weekly_learnings(niche_id)` reads top vs bottom decile videos with Sonnet (Batch API), writes `learnings.md` per niche to S3
-- [ ] Script-gen system prompt loads `learnings.md` on next run if present
-- [ ] Dashboard: per-video metrics + cost + margin proxy
+## Phase 7 (Multi-platform via Buffer / Publer) — start here next
+- [ ] Add `BufferPublisher` (or `PublerPublisher`) implementing the same `Publisher` ABC
+- [ ] Schedule slots per platform per niche; respect Buffer's rate limits + approval queue
+- [ ] Wire IG / TikTok / X / LinkedIn through the new publisher
+- [ ] Extend `publish_video` to accept multi-platform fan-out
+
+## Phase 6 leftovers (defer; nice-to-have)
+- [ ] YouTube Analytics API for `avg_view_duration_sec`, `retention_curve`, `ctr` (Data API only exposes counts)
+- [ ] Sonnet Batch API for the weekly learnings synthesis (50% off, 24h SLA — fine for weekly cadence)
+- [ ] Surface learnings.md content on the dashboard so the operator can see what the model is feeding back
+
+## Phase 6 — done
+- [x] `snapshot_metrics(publication_id)` Celery task pulling YouTube Data API stats
+- [x] Schedule t+24h / t+72h / t+7d ETAs at publish time
+- [x] Beat-driven `nightly_catchup` (02:00 UTC) for missed publications
+- [x] `weekly_learnings(niche_id)` Sonnet synthesis → `niches/{niche_id}/learnings_v1.md` in S3
+- [x] Beat-driven `weekly_learnings_all` (Sun 02:00 UTC) fans out per niche
+- [x] Script-gen `load_learnings(niche_id)` appends to system prompt on next run
+- [x] `GET /metrics/by-video` API + dashboard `/metrics` page (views, likes, cost, margin proxy)
+- [x] CLI: `analytics snapshot --publication-id` + `analytics learnings --niche`
+- [x] Make: `make snapshot PUBLICATION=<uuid>`, `make learnings NICHE=<slug>`
 
 ## Phase 5 — done
 - [x] `Publisher` ABC + `VideoMetadata` schema in `packages/publishers/shortstack_publishers/base.py`
