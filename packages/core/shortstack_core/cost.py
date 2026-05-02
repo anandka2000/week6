@@ -244,3 +244,36 @@ def assert_under_hard_cap(
 ) -> None:
     if cost_cents > cap_cents:
         raise CostCapExceeded(video_id=video_id, cost_cents=cost_cents, cap_cents=cap_cents)
+
+
+def check_video_cap(
+    session: Session,
+    *,
+    video_id: UUID,
+    hard_cap_cents: int,
+    soft_cap_cents: int = 75,
+) -> None:
+    """Inspect a video's rolling ``cost_cents`` and raise / warn as needed.
+
+    Call this immediately after every ``record_*`` for a video so the next
+    paid action is gated. Same session as the record so we see uncommitted
+    increments.
+    """
+    from .db import Video
+    from .logging import get_logger
+
+    video = session.get(Video, video_id)
+    if video is None:
+        return
+    current = Decimal(video.cost_cents)
+    if current > hard_cap_cents:
+        raise CostCapExceeded(
+            video_id=video_id, cost_cents=current, cap_cents=hard_cap_cents
+        )
+    if current > soft_cap_cents:
+        get_logger(__name__).warning(
+            "cost.soft_cap",
+            video_id=str(video_id),
+            cost_cents=float(current),
+            soft_cap=soft_cap_cents,
+        )
