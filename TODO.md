@@ -1,11 +1,18 @@
 # Open questions & follow-ups
 
-## Phase 4 (Remotion render service) — start here next
-- [ ] `apps/render/src/compositions/Vertical.tsx` taking `{ scenes, audioUrl, captions }` props
-- [ ] Ken Burns on each image; word-level highlighted captions; bottom-third CTA bar
-- [ ] POST `/render` in `apps/render/src/server.ts`: takes a `video_id`, downloads inputs from S3 via signed URLs, renders, writes `output.mp4` back to S3, returns the key
-- [ ] Worker task `render_video(video_id)` calls the render service synchronously with a long timeout, then flips `pending_render -> pending_review`
-- [ ] Update e2e-stub to chain through render when a `RENDER_SERVICE_URL` is reachable
+## Phase 5 (YouTube Shorts publisher) — start here next
+- [ ] `Publisher` Protocol in `packages/publishers/shortstack_publishers/base.py` with `publish(video, metadata) -> PublicationResult`
+- [ ] `YouTubeShortsPublisher` impl using OAuth refresh-token flow
+- [ ] Worker task `publish_video(video_id, platform)` consumes `approved` videos, transitions `approved -> publishing -> published`
+- [ ] Upload payload sets `selfDeclaredMadeForKids=false` and the synthetic-content disclosure flag (see DECISIONS.md 2026-04-26)
+- [ ] Persist `Publication` row + schedule first `metric_snapshot` ETA at t+24h
+
+## Phase 4 — done
+- [x] `apps/render/src/compositions/Vertical.tsx` — Ken Burns, word-by-word captions, fade-in CTA bar
+- [x] POST `/render`: bundle once + cache, `selectComposition` honoring `calculateMetadata`, S3 upload via `@aws-sdk/client-s3`
+- [x] Worker `render_video(video_id)` → signs S3 URLs, POSTs the body, records cost, `pending_render → pending_review`
+- [x] CLI: `render video --video-id <uuid>`. Make: `make render-video VIDEO=<uuid>`
+- [x] e2e-stub chains real render when `RENDER_SERVICE_URL` is reachable; falls back to demo flip otherwise
 
 ## Phase 3 — done
 - [x] `generate_scene_visual(video_id, script_id, scene_index)` Pexels-first / Flux-fallback (Haiku graded)

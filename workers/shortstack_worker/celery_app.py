@@ -31,6 +31,7 @@ app = Celery(
         "shortstack_worker.tasks.tts",
         "shortstack_worker.tasks.captions",
         "shortstack_worker.tasks.assets",
+        "shortstack_worker.tasks.render",
     ],
 )
 

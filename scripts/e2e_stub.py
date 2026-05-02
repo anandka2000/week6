@@ -29,6 +29,7 @@ from shortstack_core.db import Niche, Script, Trend, Video, session_scope
 from shortstack_core.enums import ScriptMode, ScriptStatus, VideoStatus
 from shortstack_core.schemas import VOICE_ID_PLACEHOLDER, NichePersona, Scene, ScriptDraft
 from shortstack_worker.tasks import assets as asset_tasks
+from shortstack_worker.tasks import render as render_tasks
 from shortstack_worker.tasks import scripts as script_tasks
 from shortstack_worker.tasks import trends as trend_tasks
 
@@ -160,7 +161,7 @@ def main() -> int:
             voice_id_set = persona.voice_id != VOICE_ID_PLACEHOLDER
 
     if have_anthropic and have_assets_keys and voice_id_set:
-        print("[5/6] generate_assets (visuals -> tts -> captions)")
+        print("[5/7] generate_assets (visuals -> tts -> captions)")
         try:
             assets_result = asset_tasks.generate_assets.run(str(video_id))
             print(
@@ -170,14 +171,34 @@ def main() -> int:
             )
         except Exception as exc:  # noqa: BLE001 — demo path, surface and keep going
             print(f"      asset pipeline failed: {exc}")
-        # Render is Phase 4 — flip pending_render -> pending_review for the demo.
+
+        # Phase 4: real Remotion render. Falls back to demo flip if the render
+        # service is unreachable so the demo still ends at /review.
         with session_scope() as s:
             v = s.get(Video, video_id)
-            if v is not None and v.status == VideoStatus.PENDING_RENDER:
-                v.status = VideoStatus.PENDING_REVIEW
-                print("[6/6] [demo] flipped pending_render -> pending_review (render is Phase 4)")
-            elif v is not None:
-                print(f"[6/6] video status={v.status} — leaving as-is")
+            ready_to_render = v is not None and v.status == VideoStatus.PENDING_RENDER
+
+        if ready_to_render:
+            print("[6/7] render_video (Remotion)")
+            try:
+                render_result = render_tasks.render_video.run(str(video_id))
+                print(
+                    f"      mp4={render_result['s3_key_mp4']} "
+                    f"took={render_result['render_ms']}ms "
+                    f"cost={render_result['render_cost_cents']:.3f}c"
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"      render failed: {exc} — falling back to demo flip")
+                with session_scope() as s:
+                    v = s.get(Video, video_id)
+                    if v is not None and v.status == VideoStatus.PENDING_RENDER:
+                        v.status = VideoStatus.PENDING_REVIEW
+            print("[7/7] approval gate ready")
+        else:
+            with session_scope() as s:
+                v = s.get(Video, video_id)
+                status = v.status.value if v else "missing"
+            print(f"[6/7] video status={status} — skipping render")
     else:
         missing = []
         if not have_anthropic:

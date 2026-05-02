@@ -1,4 +1,4 @@
-.PHONY: up down install dev worker beat render migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
+.PHONY: up down install dev worker beat render render-video migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
 
 up:
 	docker compose --env-file .env -f infra/docker-compose.yml up -d
@@ -56,6 +56,9 @@ trends-pick:
 
 assets:
 	uv run python -m shortstack_worker.cli assets generate --video-id $(VIDEO)
+
+render-video:
+	uv run python -m shortstack_worker.cli render video --video-id $(VIDEO)
 
 NICHE ?= ai-productivity
 

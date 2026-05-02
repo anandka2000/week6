@@ -136,6 +136,50 @@ Loaded lazily via `lru_cache`. Cheap enough to run on the worker box
 and ~150MB model footprint. We can swap to `small.en` if accuracy
 matters, or to GPU if throughput becomes a problem. No need yet.
 
+## 2026-05-02 — Phase 4 (render)
+
+### Render service is stateless; worker passes everything in the request body
+The Remotion service has no DB / S3-read access for inputs — the worker
+generates 1h signed URLs (one per scene image + audio), inlines the
+captions JSON, and POSTs the whole payload. The render service only
+needs S3 *write* credentials to upload the mp4. Trade-off: a few KB
+larger request bodies; gain is much simpler render-service deployment
+(just an Express app + Remotion bundle, no DB driver).
+
+### Bundle is cached at module level, reset on failure
+`bundle()` is the slow part of Remotion (~3-10s on first call). We keep
+the resulting serve-URL in a module-level `Promise<string>` so subsequent
+requests reuse it. On bundler failure the cache is reset to `null` so
+a follow-up request retries cleanly rather than serving the rejected
+promise forever.
+
+### Render cost is a flat $0.001/render-second placeholder
+We don't have CPU-time pricing for the render box yet, so
+`RENDER_COST_PER_SEC_USD = 0.001` in `tasks/render.py` is a SWAG. Re-tune
+once we know the box. The `cost_event` records `render_ms` and
+`size_bytes` in `meta` so we can backfill if the rate changes.
+
+### CTA fades in over the last 3 seconds, not persistent
+Persistent CTA pulls the eye away from the hook + payoff. Fade-in at
+T-3s gives the viewer the call-to-action exactly when the video is
+about to end. If retention data later says the persistent variant
+performs better we can A/B per-niche.
+
+### Captions render in a 6-word sliding window with the active word in `#fbbf24`
+Sliding window keeps reading load light and matches what high-retention
+shorts on TikTok/Reels do. Active-word highlight is the single biggest
+lever for keeping the eye on the screen (gives the brain a moving
+target). Color is amber rather than white-on-bold so it pops without
+clashing with the hook overlay.
+
+### The render service uploads mp4 directly (not via the worker)
+Two simpler paths exist: (1) render service writes to S3, (2) worker
+downloads from render service and writes to S3. We picked (1) — the
+worker doesn't need to handle a potentially-large mp4 in memory, and
+the render service already has the file on disk after `renderMedia`.
+Trade-off: render service needs S3 write credentials (it has them via
+the same env vars). Same network blast radius either way.
+
 ## 2026-05-02 — Test-cycle fixes
 
 ### `estimate_llm_cost_cents` no longer subtracts `cache_read_tokens` from `input_tokens`

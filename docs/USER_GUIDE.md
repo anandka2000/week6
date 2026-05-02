@@ -56,7 +56,7 @@ Add the keys you have. Each unlocks more of the pipeline:
 |---|---|
 | `ANTHROPIC_API_KEY` | Haiku scores trends; Sonnet writes scripts; cost estimate stamped on video |
 | `+ ELEVENLABS_API_KEY` `+ PEXELS_API_KEY` `+ REPLICATE_API_TOKEN` | Real per-scene visuals + voiceover + word-level captions in MinIO |
-| (Phase 4) | Remotion renders mp4 |
+| + render service running (`make dev` boots it) | Remotion renders 1080×1920 mp4 to `videos/{video_id}/output.mp4` |
 | (Phase 5) | YouTube Shorts upload |
 
 Plus, edit the seeded niche's `voice_id`:
@@ -508,7 +508,7 @@ make worker   # equivalent to: celery -A shortstack_worker.celery_app worker -Q 
 | Day 7: Polish | ✅ | README + DECISIONS appendix |
 | **Phase 2: Script gen** | ✅ | Sonnet 4.6 + reprompt loop + scene-0 hook constraint + CTA rewrite |
 | **Phase 3: Assets** | ✅ | Pexels-first / Flux-fallback (Haiku grader) + ElevenLabs Turbo + faster-whisper word timings + rolling cost cap |
-| Phase 4: Render | ⏳ next | Remotion composition + POST /render real implementation |
+| **Phase 4: Render** | ✅ | Remotion `Vertical` composition (1080×1920, Ken Burns, word-level highlighted captions, fade-in CTA bar). `POST /render` bundles once, renders, uploads mp4 to S3. Worker `render_video(video_id)` task pulls assets, calls render service, records cost, transitions `pending_render → pending_review`. |
 | Phase 5: Publisher | — | YouTube Shorts via OAuth refresh-token; manual approval gates publish |
 | Phase 6: Analytics & feedback | — | Nightly metrics pull + weekly Sonnet "learnings.md" |
 | Phase 7: Multi-platform | — | IG / TikTok / X / LinkedIn via Buffer or Publer API |
