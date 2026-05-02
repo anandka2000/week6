@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 
 from shortstack_core.db import Niche, session_scope
-from shortstack_core.schemas import NichePersona
+from shortstack_core.schemas import VOICE_ID_PLACEHOLDER, NichePersona
 
 
 SEEDS = [
@@ -18,7 +18,7 @@ SEEDS = [
         "name": "AI Productivity",
         "persona": NichePersona(
             brand="Trending Tech: AI Productivity",
-            voice_id="REPLACE_WITH_ELEVENLABS_VOICE_ID",
+            voice_id=VOICE_ID_PLACEHOLDER,
             tone="energetic, no-fluff, contrarian-friendly",
             hook_styles=["pattern_interrupt", "curiosity_gap", "contrarian"],
             banned_topics=["politics", "celebrity gossip"],

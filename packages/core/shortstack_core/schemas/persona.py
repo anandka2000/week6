@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+# Sentinel value for ``NichePersona.voice_id`` used by the seeder until an
+# operator pins a real ElevenLabs voice. Producers (TTS) and the e2e stub
+# both check against this constant so the literal lives in one place.
+VOICE_ID_PLACEHOLDER = "REPLACE_WITH_ELEVENLABS_VOICE_ID"
+
 
 class NichePersona(BaseModel):
     brand: str = Field(description="Channel brand, e.g. 'Trending Tech: AI Productivity'")

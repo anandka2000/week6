@@ -27,8 +27,7 @@ from sqlalchemy import select, update
 
 from shortstack_core.db import Niche, Script, Trend, Video, session_scope
 from shortstack_core.enums import ScriptMode, ScriptStatus, VideoStatus
-from shortstack_core.schemas import Scene, ScriptDraft
-from shortstack_core.schemas import NichePersona
+from shortstack_core.schemas import VOICE_ID_PLACEHOLDER, NichePersona, Scene, ScriptDraft
 from shortstack_worker.tasks import assets as asset_tasks
 from shortstack_worker.tasks import scripts as script_tasks
 from shortstack_worker.tasks import trends as trend_tasks
@@ -129,7 +128,10 @@ def main() -> int:
                 mode=ScriptMode.TREND,
                 draft_json=draft.model_dump(),
                 prompt_version="stub_v0",
-                status=ScriptStatus.DRAFT,
+                # Match real ``generate_script`` so 'validated' is the single
+                # consistent shipping state regardless of which path created
+                # the row.
+                status=ScriptStatus.VALIDATED,
             )
             s.add(script)
             s.flush()
@@ -155,7 +157,7 @@ def main() -> int:
         niche_row = s.get(Niche, uuid.UUID(niche_id))
         if niche_row is not None:
             persona = NichePersona.model_validate(niche_row.persona_json)
-            voice_id_set = persona.voice_id != "REPLACE_WITH_ELEVENLABS_VOICE_ID"
+            voice_id_set = persona.voice_id != VOICE_ID_PLACEHOLDER
 
     if have_anthropic and have_assets_keys and voice_id_set:
         print("[5/6] generate_assets (visuals -> tts -> captions)")

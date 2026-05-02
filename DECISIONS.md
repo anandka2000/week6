@@ -135,3 +135,35 @@ on the s3 key; the render service doesn't need to know which.
 Loaded lazily via `lru_cache`. Cheap enough to run on the worker box
 and ~150MB model footprint. We can swap to `small.en` if accuracy
 matters, or to GPU if throughput becomes a problem. No need yet.
+
+## 2026-05-02 — Test-cycle fixes
+
+### `estimate_llm_cost_cents` no longer subtracts `cache_read_tokens` from `input_tokens`
+The Anthropic SDK already returns `usage.input_tokens` *excluding* cached
+tokens (those are split into `cache_read_input_tokens` /
+`cache_creation_input_tokens`). Subtracting `cache_read_tokens` again
+double-discounted cache hits and produced negative costs whenever the
+cache hit was larger than the live input. The helper now bills
+`input_tokens` at the input rate and `cache_read_tokens` at the
+cache-read rate independently. The test
+`test_llm_cache_read_is_cheaper` was updated to encode the new semantics
+(cached run is exactly `cache_read_per_mtok / input_per_mtok` of the
+full price — for Sonnet that's exactly 10× cheaper).
+
+### Pytest collection: switched to `--import-mode=importlib`
+We have two test packages both named `tests/` (one under
+`packages/core/`, one under `workers/`). Pytest's default `prepend`
+import mode can't reconcile two same-named packages. We added
+`addopts = "--import-mode=importlib"` to the existing
+`[tool.pytest.ini_options]` block in `pyproject.toml` rather than
+deleting the `__init__.py` files, because `importlib` mode is the
+modern recommendation, doesn't mutate `sys.path`, and lets us add more
+workspace-member test packages later without further collision.
+
+### `record_cost` rounds (not truncates) when stamping `videos.cost_cents`
+`Video.cost_cents` is a SQL `Integer`, but `record_cost` accumulates a
+`Decimal` (sub-cent precision). Truncating toward zero with `int(...)`
+under-counted the rolling cap by up to N cents per video — every cost
+event under 1¢ effectively recorded as zero. We now `round` instead.
+The proper fix is to promote the column to `Numeric`; that's a schema
+migration and is tracked in `TODO.md`.

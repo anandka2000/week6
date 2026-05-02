@@ -128,26 +128,27 @@ def generate_script(trend_id: str) -> dict[str, Any]:
                 }
             )
 
-    # Always record cost events, success or failure.
-    with session_scope() as s:
-        for i, u in enumerate(usages):
-            record_llm(
-                s,
-                niche_id=niche_id,
-                model=u.model,
-                input_tokens=u.input_tokens,
-                output_tokens=u.output_tokens,
-                cache_read_tokens=u.cache_read_tokens,
-                cache_write_tokens=u.cache_write_tokens,
-                meta={
-                    "task": "generate_script",
-                    "attempt": i,
-                    "prompt_version": PROMPT_VERSION,
-                    "trend_id": trend_id,
-                },
-            )
-
+    # If validation never succeeded we still want the cost events recorded
+    # against the niche so the spend isn't invisible. There is no Video to
+    # attribute them to in that case.
     if draft is None:
+        with session_scope() as s:
+            for i, u in enumerate(usages):
+                record_llm(
+                    s,
+                    niche_id=niche_id,
+                    model=u.model,
+                    input_tokens=u.input_tokens,
+                    output_tokens=u.output_tokens,
+                    cache_read_tokens=u.cache_read_tokens,
+                    cache_write_tokens=u.cache_write_tokens,
+                    meta={
+                        "task": "generate_script",
+                        "attempt": i,
+                        "prompt_version": PROMPT_VERSION,
+                        "trend_id": trend_id,
+                    },
+                )
         raise ValueError(
             f"script validation failed after {MAX_REPROMPTS + 1} attempts: {last_error}"
         )
@@ -183,10 +184,32 @@ def generate_script(trend_id: str) -> dict[str, Any]:
         )
         s.add(video)
         s.flush()
+        video_id = video.id
+
+        # Record one cost_event per Sonnet call now that the Video row exists,
+        # so script-gen spend rolls up into ``videos.cost_cents``. Same
+        # transaction so the video is guaranteed visible to ``record_cost``.
+        for i, u in enumerate(usages):
+            record_llm(
+                s,
+                niche_id=niche_id,
+                model=u.model,
+                input_tokens=u.input_tokens,
+                output_tokens=u.output_tokens,
+                cache_read_tokens=u.cache_read_tokens,
+                cache_write_tokens=u.cache_write_tokens,
+                video_id=video_id,
+                meta={
+                    "task": "generate_script",
+                    "attempt": i,
+                    "prompt_version": PROMPT_VERSION,
+                    "trend_id": trend_id,
+                },
+            )
 
         return {
             "script_id": str(script.id),
-            "video_id": str(video.id),
+            "video_id": str(video_id),
             "estimate_cents": float(estimate),
             "cap_cents": cost_cap,
             "status": video_status.value,

@@ -3,13 +3,14 @@
 from .asset import AssetRef, CaptionsDoc, Word
 from .cost import CostEvent
 from .metrics import MetricSnapshot
-from .persona import NichePersona
+from .persona import VOICE_ID_PLACEHOLDER, NichePersona
 from .publication import PublicationResult
 from .render import RenderJob
 from .script import Scene, ScriptDraft
 from .trend import TrendCluster, TrendItem
 
 __all__ = [
+    "VOICE_ID_PLACEHOLDER",
     "AssetRef",
     "CaptionsDoc",
     "CostEvent",

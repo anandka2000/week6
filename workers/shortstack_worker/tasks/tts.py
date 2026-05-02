@@ -28,7 +28,7 @@ from shortstack_core.cost import (
 )
 from shortstack_core.db import Asset, Niche, Script, session_scope
 from shortstack_core.enums import AssetKind
-from shortstack_core.schemas import NichePersona, ScriptDraft
+from shortstack_core.schemas import VOICE_ID_PLACEHOLDER, NichePersona, ScriptDraft
 from shortstack_core.settings import get_settings
 from shortstack_core.storage import upload_bytes, video_key
 
@@ -36,8 +36,6 @@ from ..celery_app import app  # noqa: F401  (ensures app is registered)
 from ..sources import elevenlabs
 
 log = get_task_logger(__name__)
-
-VOICE_ID_PLACEHOLDER = "REPLACE_WITH_ELEVENLABS_VOICE_ID"
 
 
 def _compose_narration(draft: ScriptDraft) -> str:

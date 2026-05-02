@@ -153,7 +153,7 @@ The voice itself is **per-niche**, on `persona_json.voice_id`. Don't put a voice
 |---|---|---|
 | `PEXELS_API_KEY` | (empty) | tried first for non-hero scenes |
 | `REPLICATE_API_TOKEN` | (empty) | Flux schnell for hero scene + low-relevance fallback |
-| `FLUX_MODEL` | `black-forest-labs/flux-schnell` | fixed for now |
+| `FLUX_MODEL` | `black-forest-labs/flux-schnell` | wired through `Settings.flux_model`; the Replicate URL is built from this so you can pin a forked model without code changes |
 
 ### Trends
 
@@ -477,6 +477,21 @@ Run a worker against all queues:
 ```bash
 make worker   # equivalent to: celery -A shortstack_worker.celery_app worker -Q trends,scripts,assets,render,publish,analytics
 ```
+
+---
+
+## Known limitations
+
+- `videos.cost_cents` is an `Integer` column, so the rolling per-video cost
+  rollup is rounded to the nearest cent on each `record_*` call. Sub-cent
+  precision IS preserved on `cost_events.cost_cents` (Numeric), so reporting
+  off `cost_events` is accurate; the cap-check off `videos.cost_cents` is
+  accurate to ±0.5¢ per recorded event. Promoting `Video.cost_cents` to
+  `Numeric` is tracked in `TODO.md`.
+- `make e2e-stub` runs every step inline (no Celery worker). Real production
+  traffic should go through `make worker` + beat.
+- Reddit fetch uses public `/hot.json` (no OAuth). Rate-limited; PRAW
+  migration tracked in `TODO.md`.
 
 ---
 

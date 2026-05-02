@@ -38,6 +38,10 @@
 - [ ] Verify all vendor prices in `packages/core/shortstack_core/cost.py` against current rate cards
 - [ ] Decide stock-relevance score threshold (default 6/10) once Phase 3 is in
 - [ ] Add weekly cost rollup to dashboard
+- [ ] Promote `Video.cost_cents` from `Integer` to `Numeric` via a new alembic
+      migration so the rolling per-video rollup keeps sub-cent precision (see
+      DECISIONS.md 2026-05-02). Until then `record_cost` rounds to nearest cent
+      on each event; reporting off `cost_events` is exact.
 
 ## Brand / channel
 - [ ] Replace `REPLACE_WITH_ELEVENLABS_VOICE_ID` in seed with the real voice id for `ai-productivity`
