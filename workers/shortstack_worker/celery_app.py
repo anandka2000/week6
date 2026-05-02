@@ -27,6 +27,10 @@ app = Celery(
         "shortstack_worker.tasks.health",
         "shortstack_worker.tasks.trends",
         "shortstack_worker.tasks.scripts",
+        "shortstack_worker.tasks.visuals",
+        "shortstack_worker.tasks.tts",
+        "shortstack_worker.tasks.captions",
+        "shortstack_worker.tasks.assets",
     ],
 )
 
@@ -47,6 +51,9 @@ app.conf.update(
         "shortstack_worker.tasks.trends.*": {"queue": Queue.TRENDS.value},
         "shortstack_worker.tasks.scripts.*": {"queue": Queue.SCRIPTS.value},
         "shortstack_worker.tasks.assets.*": {"queue": Queue.ASSETS.value},
+        "shortstack_worker.tasks.visuals.*": {"queue": Queue.ASSETS.value},
+        "shortstack_worker.tasks.tts.*": {"queue": Queue.ASSETS.value},
+        "shortstack_worker.tasks.captions.*": {"queue": Queue.ASSETS.value},
         "shortstack_worker.tasks.render.*": {"queue": Queue.RENDER.value},
         "shortstack_worker.tasks.publish.*": {"queue": Queue.PUBLISH.value},
         "shortstack_worker.tasks.analytics.*": {"queue": Queue.ANALYTICS.value},

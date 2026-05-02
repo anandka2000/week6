@@ -16,7 +16,22 @@ from shortstack_core.schemas import Scene, ScriptDraft
 
 
 def _draft(narration_len: int = 50, n_scenes: int = 5) -> ScriptDraft:
+    """Build a valid ScriptDraft.
+
+    Scene 0 is the hook (duration_sec <= 3.0); the rest are 4.0s. Narration
+    is a single token of ``narration_len`` characters so it counts as 1 word
+    regardless of length (satisfies the ``scenes[0].narration`` ≤ 10 words rule).
+    """
     scenes = [
+        Scene(
+            index=0,
+            narration="x" * narration_len,
+            on_screen_text="",
+            visual_prompt="prompt",
+            duration_sec=2.5,
+        )
+    ]
+    scenes.extend(
         Scene(
             index=i,
             narration="x" * narration_len,
@@ -24,13 +39,14 @@ def _draft(narration_len: int = 50, n_scenes: int = 5) -> ScriptDraft:
             visual_prompt="prompt",
             duration_sec=4.0,
         )
-        for i in range(n_scenes)
-    ]
+        for i in range(1, n_scenes)
+    )
+    total = 2.5 + 4.0 * (n_scenes - 1)
     return ScriptDraft(
         hook="ok hook",
         scenes=scenes,
         cta="follow",
-        total_duration_sec=4.0 * n_scenes,
+        total_duration_sec=total,
         prompt_version="v1",
         model="claude-sonnet-4-6",
     )

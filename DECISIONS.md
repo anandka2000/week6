@@ -98,3 +98,40 @@ it's cheap to overshoot and reject. The estimate is stamped on
 the video row is created as `status='failed'` with
 `failure_reason='cost_cap_estimate (...)'` rather than ever entering
 `pending_assets`.
+
+## 2026-05-02 — Phase 3 (assets)
+
+### Asset orchestration is serial within one Celery task
+`generate_assets(video_id)` calls `generate_scene_visual` per scene, then
+`synthesize_voiceover`, then `transcribe_audio` — all via `.run(...)`
+(inline, no queue hop). Sub-tasks are individually idempotent (skip on
+existing Asset of the matching kind), so this whole task is safe to
+retry; it picks up at the first missing asset.
+
+We considered Celery `chord`/`group` for per-scene parallelism but the
+serial pattern is simpler, the rolling cost-cap check is cleaner, and
+typical scene counts are 4–6 so wall-clock cost is small. Revisit if
+visuals dominate end-to-end latency.
+
+### Rolling cost cap fires inside each producer
+Every `record_*` is followed by `check_video_cap(session, video_id, ...)`
+in the same transaction. `CostCapExceeded` propagates out of the task,
+the orchestrator catches it, marks the video FAILED with
+`failure_reason='cost_cap (...)'`, and re-raises. Already-paid-for assets
+are kept (we already paid; the next retry can use them).
+
+### Pexels candidates sent to Haiku include the page URL, not the image URL
+The Haiku relevance grader sees `{index, alt, src=page_url}`. We're
+sending the page URL as a stable, human-readable identifier, not because
+Haiku can fetch images (it can't). This is a minor smell and may need to
+become "alt-only" once we get real outputs. Tracked in TODO.md.
+
+### Image extension is provider-driven
+Pexels portrait CDN serves JPEG → `.jpg` / `image/jpeg`. Flux schnell
+returns PNG → `.png` / `image/png`. The provider determines the suffix
+on the s3 key; the render service doesn't need to know which.
+
+### Whisper model is `base.en`, CPU, int8
+Loaded lazily via `lru_cache`. Cheap enough to run on the worker box
+and ~150MB model footprint. We can swap to `small.en` if accuracy
+matters, or to GPU if throughput becomes a problem. No need yet.

@@ -25,14 +25,23 @@ make worker                # start Celery (all 6 queues)
 make beat                  # start Celery beat
 ```
 
-## Try the trend slice
+## Try the pipeline
 
 ```bash
 make trends-fetch    NICHE=ai-productivity   # Reddit hot.json -> trends table
 make trends-cluster  NICHE=ai-productivity   # Haiku scores 1-10  (needs ANTHROPIC_API_KEY)
 make trends-pick     NICHE=ai-productivity   # consume the highest-scored trend
-make e2e-stub        NICHE=ai-productivity   # all of the above + draft a pending_review video
+make assets          VIDEO=<uuid>            # visuals + tts + captions for a video
+make e2e-stub        NICHE=ai-productivity   # all of the above end-to-end
 ```
+
+`make e2e-stub` adapts to whichever keys are available:
+
+| keys present | pipeline runs through |
+|---|---|
+| (none) | trends → fallback score=5 → placeholder script → pending_review |
+| `ANTHROPIC_API_KEY` | + Sonnet script generation, real cost estimate |
+| + ElevenLabs + Pexels + Replicate + real `voice_id` | + visuals + tts + captions, status reaches pending_render |
 
 Then visit http://localhost:3000/review and click **Approve**.
 
@@ -80,17 +89,36 @@ Tests use respx to mock Reddit + Anthropic; no API keys or network needed.
 
 ## Phase status
 
-| Day | Phase | Status | Notes |
-|---|---|---|---|
-| 1 | Skeleton | done | services boot |
-| 2 | Schemas + DB | done | 8 tables, alembic 0001 |
-| 3 | Celery + cost | done | 6 queues, pricing table, structlog |
-| 4 | Trends (Reddit) | done | YouTube + GTrends sources are TODO |
-| 5 | Dashboard | done | read-only |
-| 6 | Approval gate | done | `make e2e-stub` works |
-| 7 | Polish | done | this README |
+| Day / Phase | Status | Notes |
+|---|---|---|
+| Day 1: Skeleton | done | services boot |
+| Day 2: Schemas + DB | done | 8 tables, alembic 0001 |
+| Day 3: Celery + cost | done | 6 queues, pricing, structlog |
+| Day 4: Trends (Reddit) | done | YouTube + GTrends sources still TODO |
+| Day 5: Dashboard | done | read-only |
+| Day 6: Approval gate | done | `make e2e-stub` |
+| Day 7: Polish | done |  |
+| **Phase 2: Script gen** | done | Sonnet 4.6, reprompt loop, scene-0 hook constraint, CTA rewrite |
+| **Phase 3: Assets** | done | Pexels-first / Flux-fallback (Haiku grader), ElevenLabs Turbo, faster-whisper word timings, rolling cost cap |
 
-Next up: **Phase 2** — Sonnet script generation with cached hook-framework prompt. Tracked in TODO.md. See DECISIONS.md before changing anything material.
+Next up: **Phase 4 — Remotion render service**. Tracked in TODO.md.
+
+## Per-asset pipeline (Phase 3)
+
+```
+generate_assets(video_id)
+  ├─ for each scene i:
+  │     generate_scene_visual(video_id, script_id, i)
+  │       hero (i=0) → Flux schnell
+  │       else → Pexels search → Haiku relevance grader
+  │              score ≥ 6 → Pexels; else → Flux fallback
+  ├─ synthesize_voiceover(video_id, script_id)
+  │     ElevenLabs Turbo v2.5, persona.voice_id, mp3
+  └─ transcribe_audio(video_id, audio_asset_id)
+        faster-whisper base.en, word-level timestamps → captions.json
+
+Each cost-incurring step calls check_video_cap; CostCapExceeded → Video.status = failed.
+```
 
 ## Useful URLs (local)
 

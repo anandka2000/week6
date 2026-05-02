@@ -28,6 +28,8 @@ from sqlalchemy import select, update
 from shortstack_core.db import Niche, Script, Trend, Video, session_scope
 from shortstack_core.enums import ScriptMode, ScriptStatus, VideoStatus
 from shortstack_core.schemas import Scene, ScriptDraft
+from shortstack_core.schemas import NichePersona
+from shortstack_worker.tasks import assets as asset_tasks
 from shortstack_worker.tasks import scripts as script_tasks
 from shortstack_worker.tasks import trends as trend_tasks
 
@@ -143,17 +145,50 @@ def main() -> int:
             video_id = video.id
             print(f"      video_id={video_id}")
 
-    # Phases 3-4 (assets, render) aren't implemented yet, so flip pending_assets ->
-    # pending_review here so the demo reaches the approval gate.
+    # Phase 3 assets requires several API keys + a real voice_id; skip if any missing.
+    have_assets_keys = all(
+        os.environ.get(k)
+        for k in ("ELEVENLABS_API_KEY", "PEXELS_API_KEY", "REPLICATE_API_TOKEN")
+    )
+    voice_id_set = False
     with session_scope() as s:
-        v = s.get(Video, video_id)
-        if v is not None and v.status == VideoStatus.PENDING_ASSETS:
-            v.status = VideoStatus.PENDING_REVIEW
+        niche_row = s.get(Niche, uuid.UUID(niche_id))
+        if niche_row is not None:
+            persona = NichePersona.model_validate(niche_row.persona_json)
+            voice_id_set = persona.voice_id != "REPLACE_WITH_ELEVENLABS_VOICE_ID"
+
+    if have_anthropic and have_assets_keys and voice_id_set:
+        print("[5/6] generate_assets (visuals -> tts -> captions)")
+        try:
+            assets_result = asset_tasks.generate_assets.run(str(video_id))
             print(
-                "[5/5] [demo] flipped pending_assets -> pending_review (assets/render are Phase 3-4)"
+                f"      visuals={len(assets_result['visuals'])} "
+                f"voice.chars={assets_result['voice']['characters']} "
+                f"captions.words={assets_result['captions']['n_words']}"
             )
-        else:
-            print(f"[5/5] video status={v.status if v else 'missing'} — leaving as-is")
+        except Exception as exc:  # noqa: BLE001 — demo path, surface and keep going
+            print(f"      asset pipeline failed: {exc}")
+        # Render is Phase 4 — flip pending_render -> pending_review for the demo.
+        with session_scope() as s:
+            v = s.get(Video, video_id)
+            if v is not None and v.status == VideoStatus.PENDING_RENDER:
+                v.status = VideoStatus.PENDING_REVIEW
+                print("[6/6] [demo] flipped pending_render -> pending_review (render is Phase 4)")
+            elif v is not None:
+                print(f"[6/6] video status={v.status} — leaving as-is")
+    else:
+        missing = []
+        if not have_anthropic:
+            missing.append("ANTHROPIC_API_KEY")
+        if not have_assets_keys:
+            missing.append("ELEVENLABS_API_KEY/PEXELS_API_KEY/REPLICATE_API_TOKEN")
+        if not voice_id_set:
+            missing.append("voice_id")
+        print(f"[5/5] skipping assets ({', '.join(missing)} missing) — demo flip to pending_review")
+        with session_scope() as s:
+            v = s.get(Video, video_id)
+            if v is not None and v.status == VideoStatus.PENDING_ASSETS:
+                v.status = VideoStatus.PENDING_REVIEW
 
     print("      review at: http://localhost:3000/review")
     return 0

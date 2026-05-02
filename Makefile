@@ -54,6 +54,9 @@ trends-cluster:
 trends-pick:
 	uv run python -m shortstack_worker.cli trends pick --niche $(NICHE)
 
+assets:
+	uv run python -m shortstack_worker.cli assets generate --video-id $(VIDEO)
+
 NICHE ?= ai-productivity
 
 e2e-stub:
