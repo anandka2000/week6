@@ -1,4 +1,4 @@
-.PHONY: up down install dev worker beat render render-video migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
+.PHONY: up down install dev worker beat render render-video publish migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
 
 up:
 	docker compose --env-file .env -f infra/docker-compose.yml up -d
@@ -59,6 +59,9 @@ assets:
 
 render-video:
 	uv run python -m shortstack_worker.cli render video --video-id $(VIDEO)
+
+publish:
+	uv run python -m shortstack_worker.cli publish video --video-id $(VIDEO) --platform $(if $(PLATFORM),$(PLATFORM),youtube_shorts) --visibility $(if $(VISIBILITY),$(VISIBILITY),unlisted)
 
 NICHE ?= ai-productivity
 

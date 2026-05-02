@@ -136,6 +136,49 @@ Loaded lazily via `lru_cache`. Cheap enough to run on the worker box
 and ~150MB model footprint. We can swap to `small.en` if accuracy
 matters, or to GPU if throughput becomes a problem. No need yet.
 
+## 2026-05-02 — Phase 5 (YouTube publisher)
+
+### `Publisher` is an ABC, not a Protocol
+Concrete subclass + `@abstractmethod` reads better than a `Protocol`
+when there's a class attribute (`platform`) that callers depend on.
+Trade-off: subclassing instead of duck-typing; trivial.
+
+### YouTube via raw httpx, not google-api-python-client
+The official client pulls in `googleapis-common-protos`, `google-auth`,
+`google-auth-httplib2`, `httplib2`, etc. For a single resumable upload
++ refresh-token flow, those are overkill. httpx + 50 lines of glue is
+easier to test (respx-mockable) and easier to reason about. Swap to
+the official client if we hit retry/quota edge cases.
+
+### Resumable upload (not multipart) even for tiny files
+Two HTTPS calls (POST snippet → PUT bytes) instead of one multipart PUT.
+Slightly slower but cleaner failure mode: a network blip between the
+POST and the PUT can be retried without re-sending the metadata.
+
+### Status rollback on `PublishError`
+On any publish failure the worker transitions `publishing → approved`
+(not `failed`) so a retry is just another `make publish` call. The
+error message lands in `videos.failure_reason` for forensics. Trade-off:
+the video stays in the operator's "to publish" pile until they
+explicitly give up. Right default for a manual-gate v0.
+
+### Idempotency by `(video_id, platform)` UNIQUE
+The publisher itself is *not* idempotent (YouTube's API will happily
+duplicate uploads). We enforce idempotency in the worker by checking
+`Publication` first; the `UniqueConstraint(video_id, platform)` in the
+schema catches any race the in-memory check misses.
+
+### YouTube tags: ≤ 500 char total cap; AI + Shorts + brand by default
+The metadata builder dedupes and truncates greedily under the 500-char
+budget. Default tag set is just three (AI / Shorts / persona.brand) —
+the brand carries the niche-specific keyword. Persona schema can grow
+a `youtube_tags: list[str]` field later if we need finer control.
+
+### Synthetic-content disclosure: `containsSyntheticMedia=true`
+Per YouTube's March-2024 policy. Set on every upload (we always use AI).
+Plain-language disclosure also appended to the description for FTC
+hygiene.
+
 ## 2026-05-02 — Phase 4 (render)
 
 ### Render service is stateless; worker passes everything in the request body

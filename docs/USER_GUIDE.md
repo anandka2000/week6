@@ -57,7 +57,7 @@ Add the keys you have. Each unlocks more of the pipeline:
 | `ANTHROPIC_API_KEY` | Haiku scores trends; Sonnet writes scripts; cost estimate stamped on video |
 | `+ ELEVENLABS_API_KEY` `+ PEXELS_API_KEY` `+ REPLICATE_API_TOKEN` | Real per-scene visuals + voiceover + word-level captions in MinIO |
 | + render service running (`make dev` boots it) | Remotion renders 1080×1920 mp4 to `videos/{video_id}/output.mp4` |
-| (Phase 5) | YouTube Shorts upload |
+| `+ YOUTUBE_OAUTH_*` (after manual approval) | `make publish VIDEO=<uuid>` uploads as unlisted to YouTube Shorts |
 
 Plus, edit the seeded niche's `voice_id`:
 

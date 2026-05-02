@@ -6,6 +6,7 @@
     uv run python -m shortstack_worker.cli scripts generate --trend-id <uuid>
     uv run python -m shortstack_worker.cli assets generate --video-id <uuid>
     uv run python -m shortstack_worker.cli render video --video-id <uuid>
+    uv run python -m shortstack_worker.cli publish video --video-id <uuid>
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import typer
 
 from .assets import app as assets_app
+from .publish import app as publish_app
 from .render import app as render_app
 from .scripts import app as scripts_app
 from .trends import app as trends_app
@@ -22,6 +24,7 @@ app.add_typer(trends_app, name="trends")
 app.add_typer(scripts_app, name="scripts")
 app.add_typer(assets_app, name="assets")
 app.add_typer(render_app, name="render")
+app.add_typer(publish_app, name="publish")
 
 
 def main() -> None:

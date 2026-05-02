@@ -5,6 +5,7 @@ description = "ShortStack publisher interface and platform implementations"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",
+    "httpx>=0.27",
     "shortstack-core",
 ]
 

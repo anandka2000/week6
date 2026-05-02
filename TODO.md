@@ -1,11 +1,19 @@
 # Open questions & follow-ups
 
-## Phase 5 (YouTube Shorts publisher) — start here next
-- [ ] `Publisher` Protocol in `packages/publishers/shortstack_publishers/base.py` with `publish(video, metadata) -> PublicationResult`
-- [ ] `YouTubeShortsPublisher` impl using OAuth refresh-token flow
-- [ ] Worker task `publish_video(video_id, platform)` consumes `approved` videos, transitions `approved -> publishing -> published`
-- [ ] Upload payload sets `selfDeclaredMadeForKids=false` and the synthetic-content disclosure flag (see DECISIONS.md 2026-04-26)
-- [ ] Persist `Publication` row + schedule first `metric_snapshot` ETA at t+24h
+## Phase 6 (Analytics + feedback) — start here next
+- [ ] Schedule one-shot `metric_snapshot` ETAs at publish time (t+24h, t+72h, t+7d)
+- [ ] Nightly task `snapshot_metrics(publication_id)` pulls views, avg_view_duration_sec, retention_curve, ctr from YouTube Analytics
+- [ ] Weekly `weekly_learnings(niche_id)` reads top vs bottom decile videos with Sonnet (Batch API), writes `learnings.md` per niche to S3
+- [ ] Script-gen system prompt loads `learnings.md` on next run if present
+- [ ] Dashboard: per-video metrics + cost + margin proxy
+
+## Phase 5 — done
+- [x] `Publisher` ABC + `VideoMetadata` schema in `packages/publishers/shortstack_publishers/base.py`
+- [x] `YouTubeShortsPublisher` (OAuth refresh-token → resumable upload via httpx)
+- [x] Worker `publish_video(video_id, platform, visibility)` Celery task
+- [x] Status transitions: `approved → publishing → published`; rollback to `approved` on `PublishError`
+- [x] Idempotent on `(video_id, platform)`; sets `selfDeclaredMadeForKids=false` + `containsSyntheticMedia=true`
+- [x] CLI: `publish video --video-id <uuid>`. Make: `make publish VIDEO=<uuid>`
 
 ## Phase 4 — done
 - [x] `apps/render/src/compositions/Vertical.tsx` — Ken Burns, word-by-word captions, fade-in CTA bar
