@@ -1,4 +1,4 @@
-.PHONY: up down install dev worker render migrate test fmt lint seed e2e-stub clean
+.PHONY: up down install dev worker beat render migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
 
 up:
 	docker compose --env-file .env -f infra/docker-compose.yml up -d

@@ -49,7 +49,14 @@ def list_publications(
     return [PublicationRead.model_validate(p) for p in db.execute(stmt).scalars()]
 
 
-def _transition(db: Session, video_id: UUID, *, frm: set[VideoStatus], to: VideoStatus) -> Video:
+def _transition(
+    db: Session,
+    video_id: UUID,
+    *,
+    frm: set[VideoStatus],
+    to: VideoStatus,
+    failure_reason: str | None = None,
+) -> Video:
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"video {video_id} not found")
@@ -59,6 +66,8 @@ def _transition(db: Session, video_id: UUID, *, frm: set[VideoStatus], to: Video
             f"cannot transition from {video.status} to {to}",
         )
     video.status = to
+    if failure_reason is not None:
+        video.failure_reason = failure_reason
     db.commit()
     db.refresh(video)
     return video
@@ -75,9 +84,10 @@ def approve(video_id: UUID, db: Session = Depends(get_db)) -> VideoRead:
 @router.post("/videos/{video_id}/reject", response_model=VideoRead)
 def reject(video_id: UUID, db: Session = Depends(get_db)) -> VideoRead:
     v = _transition(
-        db, video_id, frm={VideoStatus.PENDING_REVIEW}, to=VideoStatus.FAILED
+        db,
+        video_id,
+        frm={VideoStatus.PENDING_REVIEW},
+        to=VideoStatus.FAILED,
+        failure_reason="rejected_in_review",
     )
-    v.failure_reason = "rejected_in_review"
-    db.commit()
-    db.refresh(v)
     return VideoRead.model_validate(v)

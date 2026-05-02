@@ -64,22 +64,23 @@ def test_llm_cost_sonnet_basic():
 
 
 def test_llm_cache_read_is_cheaper():
+    """``input_tokens`` is uncached input only; cached tokens are billed at the
+    cache-read rate. So a request that hit cache for everything should cost
+    exactly ``cache_read_per_mtok / input_per_mtok`` of the full price -- for
+    Sonnet's $3 vs $0.30 rates that's exactly 10x cheaper.
+    """
     full = estimate_llm_cost_cents(
         model="claude-sonnet-4-6", input_tokens=10_000, output_tokens=0
     )
     cached = estimate_llm_cost_cents(
         model="claude-sonnet-4-6",
-        input_tokens=10_000,
-        output_tokens=0,
-        cache_read_tokens=10_000,
-    )
-    assert cached < full
-    assert cached == estimate_llm_cost_cents(
-        model="claude-sonnet-4-6",
         input_tokens=0,
         output_tokens=0,
         cache_read_tokens=10_000,
     )
+    assert cached < full
+    # Sonnet input = $3/Mtok, cache-read = $0.30/Mtok -> cached is exactly 10x cheaper.
+    assert cached * 10 == full
 
 
 def test_haiku_cheaper_than_sonnet():

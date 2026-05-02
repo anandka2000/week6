@@ -9,16 +9,23 @@ import pytest
 import respx
 
 from shortstack_worker.sources.flux import (
-    REPLICATE_PREDICT_URL,
+    REPLICATE_PREDICT_URL_TEMPLATE,
     FluxGenerationError,
     generate_image,
+)
+
+# Built from the default ``flux_model`` setting; the autouse fixture below
+# pins the env var so this URL stays stable across tests.
+REPLICATE_PREDICT_URL = REPLICATE_PREDICT_URL_TEMPLATE.format(
+    flux_model="black-forest-labs/flux-schnell"
 )
 
 
 @pytest.fixture(autouse=True)
 def _settings(monkeypatch):
-    """Force the Replicate token used by the source under test."""
+    """Force the Replicate token + flux model used by the source under test."""
     monkeypatch.setenv("REPLICATE_API_TOKEN", "test-replicate-token")
+    monkeypatch.setenv("FLUX_MODEL", "black-forest-labs/flux-schnell")
     import shortstack_core.settings as st
 
     st._settings = None

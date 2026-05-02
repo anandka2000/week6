@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # Image gen
     replicate_api_token: str = ""
     pexels_api_key: str = ""
+    flux_model: str = "black-forest-labs/flux-schnell"
 
     # Trends
     reddit_client_id: str = ""

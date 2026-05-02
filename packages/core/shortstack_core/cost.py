@@ -71,8 +71,13 @@ def estimate_llm_cost_cents(
     cache_write_tokens: int = 0,
 ) -> Decimal:
     rate = LLM_PRICING[model]
+    # NOTE: ``input_tokens`` here is *uncached* input only. The Anthropic SDK
+    # already returns ``usage.input_tokens`` excluding cached tokens (those are
+    # split out in ``cache_read_input_tokens`` / ``cache_creation_input_tokens``),
+    # so we must NOT subtract ``cache_read_tokens`` again -- doing so would
+    # double-discount cache hits and produce negative costs.
     usd = (
-        (input_tokens - cache_read_tokens) * rate.input_per_mtok_usd / 1_000_000
+        input_tokens * rate.input_per_mtok_usd / 1_000_000
         + output_tokens * rate.output_per_mtok_usd / 1_000_000
         + cache_read_tokens * rate.cache_read_per_mtok_usd / 1_000_000
         + cache_write_tokens * rate.cache_write_per_mtok_usd / 1_000_000
@@ -139,7 +144,11 @@ def record_cost(
     if video_id is not None:
         video = session.get(Video, video_id)
         if video is not None:
-            video.cost_cents = int(Decimal(video.cost_cents) + cost_cents)
+            # TODO: promote ``Video.cost_cents`` to ``Numeric`` via a new alembic
+            # migration so we can store sub-cent precision exactly. Until then,
+            # round (don't truncate) so the rolling cap isn't undercounted by
+            # up to N cents per video. See TODO.md.
+            video.cost_cents = int(round(Decimal(video.cost_cents) + cost_cents))
     return row
 
 

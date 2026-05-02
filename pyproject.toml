@@ -34,3 +34,6 @@ select = ["E", "F", "I", "B", "UP", "N", "W"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["apps", "packages", "workers"]
+# Use importlib mode so multiple `tests/` packages (one per workspace member)
+# don't collide under the default `prepend` import mode.
+addopts = "--import-mode=importlib"

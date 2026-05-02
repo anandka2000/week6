@@ -18,6 +18,7 @@ from functools import lru_cache
 from typing import Any
 from uuid import UUID
 
+import httpx
 from celery import shared_task
 from celery.utils.log import get_task_logger
 
@@ -69,7 +70,11 @@ def _words_from_segments(segments: Iterable[Any]) -> list[Word]:
 @shared_task(
     name="shortstack_worker.tasks.captions.transcribe_audio",
     acks_late=True,
-    autoretry_for=(Exception,),
+    # Only retry transient failures: HTTP errors talking to S3, OS-level
+    # errors writing the tempfile, and faster-whisper's RuntimeError on
+    # transient model-load failure. ValueError indicates a contract
+    # violation (e.g. wrong asset kind) and must NOT be retried.
+    autoretry_for=(httpx.HTTPError, OSError, RuntimeError),
     retry_backoff=True,
     max_retries=2,
 )

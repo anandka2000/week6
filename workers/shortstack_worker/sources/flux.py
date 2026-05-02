@@ -13,8 +13,8 @@ import httpx
 
 from shortstack_core.settings import get_settings
 
-REPLICATE_PREDICT_URL = (
-    "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions"
+REPLICATE_PREDICT_URL_TEMPLATE = (
+    "https://api.replicate.com/v1/models/{flux_model}/predictions"
 )
 
 POLL_INTERVAL_SEC = 1.0
@@ -23,6 +23,10 @@ POLL_TIMEOUT_SEC = 30.0
 
 class FluxGenerationError(RuntimeError):
     """Raised when Replicate returns ``failed`` / ``canceled`` or times out."""
+
+
+def _predict_url() -> str:
+    return REPLICATE_PREDICT_URL_TEMPLATE.format(flux_model=get_settings().flux_model)
 
 
 def _auth_headers() -> dict[str, str]:
@@ -51,7 +55,7 @@ def generate_image(
     client = client or httpx.Client(timeout=15.0)
     try:
         create_resp = client.post(
-            REPLICATE_PREDICT_URL,
+            _predict_url(),
             json={
                 "input": {
                     "prompt": prompt,
