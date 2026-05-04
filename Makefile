@@ -4,7 +4,7 @@ setup:
 	bash scripts/setup.sh
 
 up:
-	docker compose --env-file .env -f infra/docker-compose.yml up -d
+	docker compose -f infra/docker-compose.yml up -d
 
 down:
 	docker compose -f infra/docker-compose.yml down

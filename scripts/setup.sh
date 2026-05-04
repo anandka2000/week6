@@ -99,7 +99,18 @@ if ! docker info >/dev/null 2>&1; then
     fi
 fi
 
+# Modern docker compose plugin (v2.5+) is required by the Makefile. The legacy
+# `docker-compose` v1 standalone doesn't accept the same flag set.
+if ! docker compose version >/dev/null 2>&1; then
+    if [ "$OS" = mac ]; then
+        err "Docker Compose plugin v2 missing. With Docker Desktop it's bundled. With Colima: 'brew install docker-compose' and ensure 'docker compose version' works."
+    else
+        err "Docker Compose plugin v2 missing. Install: 'sudo apt-get install -y docker-compose-plugin' then re-run."
+    fi
+fi
+
 ok "docker $(docker --version | awk '{print $3}' | tr -d ',')"
+ok "docker compose $(docker compose version --short 2>/dev/null || echo unknown)"
 
 # --- 3. uv (Python toolchain) ---------------------------------------------
 
@@ -144,18 +155,41 @@ if [ "$NODE_OK" -eq 0 ]; then
 fi
 ok "node $(node --version)"
 
-# --- 5. pnpm (via Corepack, bundled with Node 22) -------------------------
+# --- 5. pnpm (via Corepack first, fall back to brew/npm) -----------------
 
 step "checking pnpm"
 
-if ! have_cmd pnpm; then
-    info "enabling pnpm through Corepack"
+pnpm_works() {
+    have_cmd pnpm && pnpm --version >/dev/null 2>&1
+}
+
+if ! pnpm_works; then
+    info "trying Corepack first (bundled with Node 22)"
     if [ "$OS" = mac ]; then
-        corepack enable
+        corepack enable 2>/dev/null || true
     else
-        sudo corepack enable
+        sudo corepack enable 2>/dev/null || true
     fi
-    corepack prepare pnpm@latest --activate
+    # `corepack prepare ...` does a network fetch and is the typical failure
+    # point. Don't blow the script up if it errors — fall through to the
+    # package-manager path.
+    if ! corepack prepare pnpm@latest --activate 2>/dev/null; then
+        warn "corepack prepare failed (often a transient npmjs.org fetch). Falling back."
+    fi
+fi
+
+if ! pnpm_works; then
+    info "installing pnpm via package manager"
+    if [ "$OS" = mac ]; then
+        brew install pnpm
+    else
+        # NodeSource ships npm; use it to global-install pnpm.
+        sudo npm install -g pnpm
+    fi
+fi
+
+if ! pnpm_works; then
+    err "pnpm install failed all paths. Try manually: 'npm install -g pnpm' and re-run."
 fi
 ok "pnpm $(pnpm --version)"
 
