@@ -99,18 +99,23 @@ if ! docker info >/dev/null 2>&1; then
     fi
 fi
 
-# Modern docker compose plugin (v2.5+) is required by the Makefile. The legacy
-# `docker-compose` v1 standalone doesn't accept the same flag set.
-if ! docker compose version >/dev/null 2>&1; then
+# Modern docker compose plugin (v2.x, `docker compose ...`) is preferred,
+# but the standalone `docker-compose` binary (Colima / Podman / older Docker)
+# also works for the compose file we use. Accept either.
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif have_cmd docker-compose && docker-compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
+else
     if [ "$OS" = mac ]; then
-        err "Docker Compose plugin v2 missing. With Docker Desktop it's bundled. With Colima: 'brew install docker-compose' and ensure 'docker compose version' works."
+        err "no docker compose found. Install: 'brew install docker-compose', or use Docker Desktop."
     else
-        err "Docker Compose plugin v2 missing. Install: 'sudo apt-get install -y docker-compose-plugin' then re-run."
+        err "no docker compose found. Install: 'sudo apt-get install -y docker-compose-plugin' (or 'docker-compose')."
     fi
 fi
 
 ok "docker $(docker --version | awk '{print $3}' | tr -d ',')"
-ok "docker compose $(docker compose version --short 2>/dev/null || echo unknown)"
+ok "compose: $COMPOSE_CMD ($($COMPOSE_CMD version --short 2>/dev/null || $COMPOSE_CMD version 2>&1 | head -1))"
 
 # --- 3. uv (Python toolchain) ---------------------------------------------
 
@@ -208,13 +213,17 @@ make up
 
 info "waiting for postgres to accept connections"
 for i in $(seq 1 30); do
-    if docker exec shortstack-postgres-1 pg_isready -U shortstack >/dev/null 2>&1; then
-        ok "postgres ready"
+    # Look up the postgres container by image since the project name
+    # (and thus container prefix) varies between docker compose v2 and the
+    # `docker-compose` standalone.
+    PG_CTR=$(docker ps --filter "ancestor=postgres:15" --format "{{.Names}}" | head -1)
+    if [ -n "$PG_CTR" ] && docker exec "$PG_CTR" pg_isready -U shortstack >/dev/null 2>&1; then
+        ok "postgres ready ($PG_CTR)"
         break
     fi
     sleep 1
     if [ "$i" -eq 30 ]; then
-        err "postgres did not become ready within 30s — check 'docker logs shortstack-postgres-1'"
+        err "postgres did not become ready within 30s — check 'docker ps' and the container logs"
     fi
 done
 

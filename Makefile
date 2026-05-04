@@ -1,13 +1,18 @@
 .PHONY: setup up down install dev worker beat render render-video publish publish-all snapshot learnings produce publish-approved migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
 
+# Pick the available compose CLI. Modern Docker ships `docker compose` (the
+# v2 plugin); Colima / Podman / older installs ship the standalone
+# `docker-compose` binary. Both accept the compose file we use.
+COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
+
 setup:
 	bash scripts/setup.sh
 
 up:
-	docker compose -f infra/docker-compose.yml up -d
+	$(COMPOSE) -f infra/docker-compose.yml up -d
 
 down:
-	docker compose -f infra/docker-compose.yml down
+	$(COMPOSE) -f infra/docker-compose.yml down
 
 install:
 	uv sync
@@ -87,5 +92,5 @@ e2e-stub:
 	NICHE=$(NICHE) uv run python scripts/e2e_stub.py
 
 clean:
-	docker compose -f infra/docker-compose.yml down -v
+	$(COMPOSE) -f infra/docker-compose.yml down -v
 	rm -rf .venv node_modules apps/*/node_modules apps/*/.next
