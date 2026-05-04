@@ -199,8 +199,30 @@ if ! pnpm_works; then
     fi
 fi
 
+# Final fallback: pnpm 10+ tries to fetch @pnpm/exe from npmjs.org on first
+# run. If that's blocked (corp firewall stripping URLs with %2F, captive
+# portal, regional CDN issue), brewed pnpm still doesn't work. Pin to
+# pnpm 9 via the GitHub-released self-contained binary, which has no
+# runtime fetch.
 if ! pnpm_works; then
-    err "pnpm install failed all paths. Try manually: 'corepack disable && brew link --overwrite pnpm' (Mac) or 'npm install -g pnpm' (Linux), then re-run."
+    warn "brewed pnpm can't reach @pnpm/exe on npmjs.org. Trying self-contained pnpm 9 binary from GitHub."
+    PNPM_VER="9.15.0"
+    case "$OS-$(uname -m)" in
+        mac-arm64)    PNPM_ASSET="pnpm-macos-arm64" ;;
+        mac-x86_64)   PNPM_ASSET="pnpm-macos-x64" ;;
+        linux-x86_64) PNPM_ASSET="pnpm-linux-x64" ;;
+        linux-aarch64|linux-arm64) PNPM_ASSET="pnpm-linux-arm64" ;;
+        *) err "no prebuilt pnpm binary for $(uname -s)/$(uname -m); install manually" ;;
+    esac
+    mkdir -p "$HOME/.local/bin"
+    curl -fsSL "https://github.com/pnpm/pnpm/releases/download/v${PNPM_VER}/${PNPM_ASSET}" \
+        -o "$HOME/.local/bin/pnpm"
+    chmod +x "$HOME/.local/bin/pnpm"
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+if ! pnpm_works; then
+    err "pnpm install failed all paths (Corepack + package manager + GitHub binary). Likely a network/firewall issue with npmjs.org — check 'curl -v https://registry.npmjs.org/' and re-run."
 fi
 ok "pnpm $(pnpm --version)"
 
