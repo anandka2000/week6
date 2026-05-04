@@ -186,15 +186,21 @@ fi
 if ! pnpm_works; then
     info "installing pnpm via package manager"
     if [ "$OS" = mac ]; then
-        brew install pnpm
+        # Corepack shims occupy /opt/homebrew/bin/{pnpm,pnpx}; brew refuses to
+        # symlink over them. Disable corepack first, then install, then
+        # force-link to claim those paths cleanly.
+        corepack disable 2>/dev/null || true
+        brew install pnpm 2>&1 || true
+        brew link --overwrite --force pnpm 2>&1 || true
     else
-        # NodeSource ships npm; use it to global-install pnpm.
+        # Same potential conflict via npm on Linux: clear corepack first.
+        sudo corepack disable 2>/dev/null || true
         sudo npm install -g pnpm
     fi
 fi
 
 if ! pnpm_works; then
-    err "pnpm install failed all paths. Try manually: 'npm install -g pnpm' and re-run."
+    err "pnpm install failed all paths. Try manually: 'corepack disable && brew link --overwrite pnpm' (Mac) or 'npm install -g pnpm' (Linux), then re-run."
 fi
 ok "pnpm $(pnpm --version)"
 
