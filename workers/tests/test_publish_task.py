@@ -115,11 +115,21 @@ def test_metadata_synthetic_media_flag_default_true():
     assert meta.made_for_kids is False
 
 
-def test_publisher_for_unknown_platform_raises():
+def test_publisher_for_buffer_platform_without_persona_raises():
     from shortstack_core.enums import Platform
 
-    with pytest.raises(ValueError, match="no publisher implementation"):
+    # IG/TikTok/X/LinkedIn are Buffer-backed and require a persona with a
+    # buffer_profiles[platform] entry; no persona -> ValueError.
+    with pytest.raises(ValueError, match="persona required"):
         _publisher_for(Platform.IG_REELS)
+
+
+def test_publisher_for_buffer_platform_missing_profile_id_raises():
+    from shortstack_core.enums import Platform
+
+    persona = _persona()  # buffer_profiles defaults to {}
+    with pytest.raises(ValueError, match="buffer_profiles"):
+        _publisher_for(Platform.TIKTOK, persona)
 
 
 def test_publish_task_is_registered():

@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     youtube_oauth_client_secret: str = ""
     youtube_oauth_refresh_token: str = ""
 
+    # Multi-platform (Buffer)
+    buffer_access_token: str = ""
+
     # Render service
     render_service_url: str = "http://localhost:8787"
 

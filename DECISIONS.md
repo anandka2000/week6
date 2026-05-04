@@ -136,6 +136,51 @@ Loaded lazily via `lru_cache`. Cheap enough to run on the worker box
 and ~150MB model footprint. We can swap to `small.en` if accuracy
 matters, or to GPU if throughput becomes a problem. No need yet.
 
+## 2026-05-02 — Phase 7 (multi-platform via Buffer)
+
+### Buffer over Publer
+Both have a Publishing API. Buffer is more widely used, has clearer docs,
+and matches the kickoff brief verbatim. Publer is interchangeable — the
+`Publisher` ABC means we can swap it in by writing `PublerPublisher` and
+flipping `_publisher_for`. No schema change needed.
+
+### One Buffer publisher per Platform, instantiated per call
+`BufferPublisher(platform=..., profile_id=...)` is constructed inside
+`_publisher_for(platform, persona)` — not a singleton. Reason: profile_id
+is per-niche-per-platform (`persona.buffer_profiles[platform.value]`), and
+the access token is per-account. Constructor cost is negligible (just
+holds an httpx client).
+
+### Buffer-backed posts get the *native* `Platform` value, not `Platform.BUFFER`
+A post published via Buffer to Instagram Reels has `Publication.platform =
+Platform.IG_REELS`, not a hypothetical `Platform.BUFFER`. Trade-off:
+analytics queries by platform are correct without a join through Buffer;
+downside is we can't tell at the row level whether the post went via
+Buffer or natively. Acceptable for v0 — we can always add a
+`Publication.via` column later.
+
+### `publish_video_all` collects per-platform errors but never auto-retries
+Sequential fan-out with `try/except` per platform. One platform failing
+does not abort the others. Failed slugs are returned in the `errors`
+array; the operator re-dispatches via
+`shortstack-worker publish all --platforms <failed-slugs>`. Auto-retry
+with backoff is a follow-up — until then we want the operator to see the
+specific platform that failed and decide.
+
+### `_run_single_publish` is a test seam
+Inside `tasks/publish.py` there's a private `_run_single_publish(video_id,
+platform, visibility)` that delegates to `publish_video.run`. The
+multi-platform tests `patch.object` this function so they can mock per
+platform without touching DB / S3. Public API of
+`publish_video_all(video_id, platforms, visibility)` is unchanged.
+
+### Buffer endpoint shapes are assumed, not verified
+Buffer's published API docs leave some response fields ambiguous (e.g.
+`media_id` vs `id`, `service_link` populated for all platforms?). The
+publisher uses fallback keys and a default Buffer-app permalink as
+`external_url`. Tracked in TODO; first real upload will reveal the
+actual shapes and we'll reconcile.
+
 ## 2026-05-02 — Phase 5 (YouTube publisher)
 
 ### `Publisher` is an ABC, not a Protocol

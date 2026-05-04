@@ -23,3 +23,7 @@ class NichePersona(BaseModel):
         default_factory=list,
         description="Subreddits used by the Reddit trends fetcher",
     )
+    buffer_profiles: dict[str, str] = Field(
+        default_factory=dict,
+        description="Maps Platform.value -> Buffer profile_id. Empty for niches that don't use Buffer.",
+    )

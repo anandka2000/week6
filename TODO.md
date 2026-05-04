@@ -1,10 +1,26 @@
 # Open questions & follow-ups
 
-## Phase 7 (Multi-platform via Buffer / Publer) — start here next
-- [ ] Add `BufferPublisher` (or `PublerPublisher`) implementing the same `Publisher` ABC
-- [ ] Schedule slots per platform per niche; respect Buffer's rate limits + approval queue
-- [ ] Wire IG / TikTok / X / LinkedIn through the new publisher
-- [ ] Extend `publish_video` to accept multi-platform fan-out
+## Phase 8 (User-story mode) — landing in the next commit alongside Phase 7
+
+## Phase 9 (Full automation) — after Phase 8 lands
+- [ ] Cron the trend → script → asset → render pipeline to produce N videos/day per niche (`niches.daily_quota`)
+- [ ] Auto-approve heuristic: caption coverage %, audio LUFS range, duration in range
+- [ ] Manual review only for new niches OR after N consecutive flops
+
+## Phase 7 — done
+- [x] `BufferPublisher` (Buffer Publishing API v2: upload-media → create-update; per-niche profile_id)
+- [x] `NichePersona.buffer_profiles` JSONB field (Platform.value → profile_id)
+- [x] `Settings.buffer_access_token` env var
+- [x] `_publisher_for(platform, persona)` routes IG / TikTok / X / LinkedIn → Buffer; YouTube → existing publisher
+- [x] `publish_video_all(video_id, platforms, visibility)` Celery task — sequential fan-out, per-platform error capture, never aborts on one failure
+- [x] CLI: `publish all --video-id <uuid> --platforms ig_reels,tiktok,x,linkedin`
+- [x] Tests: respx round-trip for BufferPublisher; multi-platform fan-out happy + partial failure
+
+## Phase 7 leftovers (defer; nice-to-have)
+- [ ] Buffer endpoint shape uncertainty — confirm the assumed `upload-media` and `updates/create.json` shapes against the live API on first real upload
+- [ ] Per-platform retry policy on `publish_video_all` (currently one-shot; operator re-dispatches failed slugs)
+- [ ] Slot scheduling per niche (Buffer rate limits + approval queue) — needs a `Slot` table + cron
+- [ ] Decide whether Buffer-backed posts get `Platform.BUFFER` or stay as the native platform value (current: native — `Platform.IG_REELS`, etc.)
 
 ## Phase 6 leftovers (defer; nice-to-have)
 - [ ] YouTube Analytics API for `avg_view_duration_sec`, `retention_curve`, `ctr` (Data API only exposes counts)

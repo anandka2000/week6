@@ -26,6 +26,7 @@ from shortstack_core.enums import Platform, VideoStatus, Visibility
 from shortstack_core.schemas import NichePersona, ScriptDraft
 from shortstack_core.storage import download_bytes
 from shortstack_publishers import (
+    BufferPublisher,
     Publisher,
     PublishError,
     VideoMetadata,
@@ -39,10 +40,28 @@ log = get_task_logger(__name__)
 # YouTube tag-list total length cap (sum of len(tag) + 1 for commas).
 YOUTUBE_TAG_TOTAL_CAP = 500
 
+# Platforms that fan out via the single Buffer account.
+_BUFFER_PLATFORMS: frozenset[Platform] = frozenset(
+    {Platform.IG_REELS, Platform.TIKTOK, Platform.X, Platform.LINKEDIN}
+)
 
-def _publisher_for(platform: Platform) -> Publisher:
+
+def _publisher_for(
+    platform: Platform, persona: NichePersona | None = None
+) -> Publisher:
     if platform is Platform.YOUTUBE_SHORTS:
         return YouTubeShortsPublisher()
+    if platform in _BUFFER_PLATFORMS:
+        if persona is None:
+            raise ValueError(
+                f"persona required to build BufferPublisher for {platform.value}"
+            )
+        profile_id = persona.buffer_profiles.get(platform.value)
+        if not profile_id:
+            raise ValueError(
+                f"persona has no buffer_profiles[{platform.value!r}] — cannot publish"
+            )
+        return BufferPublisher(platform=platform, profile_id=profile_id)
     raise ValueError(f"no publisher implementation for platform {platform.value}")
 
 
@@ -155,7 +174,7 @@ def publish_video(
     video_bytes = download_bytes(s3_key)
     metadata = _build_video_metadata(draft, persona, visibility=vis)
 
-    publisher = _publisher_for(plat)
+    publisher = _publisher_for(plat, persona)
     log.info(
         "publish.uploading",
         extra={
@@ -227,3 +246,47 @@ def publish_video(
         "snapshot_task_ids": snapshot_task_ids,
         "next_status": VideoStatus.PUBLISHED.value,
     }
+
+
+def _run_single_publish(
+    video_id: str, platform: str, visibility: str
+) -> dict[str, Any]:
+    """Indirection seam for ``publish_video_all`` — tests patch this so they
+    don't have to touch the DB / S3 path of ``publish_video.run``."""
+    return publish_video.run(video_id, platform, visibility)
+
+
+@shared_task(
+    name="shortstack_worker.tasks.publish.publish_video_all",
+    acks_late=True,
+)
+def publish_video_all(
+    video_id: str,
+    platforms: list[str],
+    visibility: str = "unlisted",
+) -> dict[str, Any]:
+    """Fan a single video out to multiple platforms sequentially.
+
+    One platform failing does not abort the others — each platform's
+    outcome is recorded independently, mirroring the per-row
+    ``publications`` model. The lead can re-dispatch only the failed
+    platforms by inspecting ``errors``.
+    """
+    results: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    for platform in platforms:
+        try:
+            outcome = _run_single_publish(video_id, platform, visibility)
+        except Exception as exc:  # noqa: BLE001 — collect, don't abort
+            log.warning(
+                "publish_all.platform_failed",
+                extra={
+                    "video_id": video_id,
+                    "platform": platform,
+                    "error": str(exc),
+                },
+            )
+            errors.append({"platform": platform, "error": str(exc)})
+            continue
+        results.append({"platform": platform, **outcome})
+    return {"video_id": video_id, "results": results, "errors": errors}

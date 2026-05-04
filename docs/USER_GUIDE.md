@@ -163,9 +163,12 @@ The voice itself is **per-niche**, on `persona_json.voice_id`. Don't put a voice
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | (empty) | reserved for PRAW migration; v0 uses public hot.json |
 | `YOUTUBE_API_KEY` | (empty) | reserved for Phase 1 follow-up (YouTube Data API source) |
 
-### Publishing (not wired in v0)
+### Publishing
 
-`YOUTUBE_OAUTH_*` — reserved for Phase 5.
+| key | default | notes |
+|---|---|---|
+| `YOUTUBE_OAUTH_CLIENT_ID` / `YOUTUBE_OAUTH_CLIENT_SECRET` / `YOUTUBE_OAUTH_REFRESH_TOKEN` | (empty) | required for `publish_video` to upload to YouTube Shorts |
+| `BUFFER_ACCESS_TOKEN` | (empty) | required for `BufferPublisher` (IG / TikTok / X / LinkedIn). Per-niche profile ids live on `persona_json.buffer_profiles`. |
 
 ### Render service
 
@@ -511,7 +514,7 @@ make worker   # equivalent to: celery -A shortstack_worker.celery_app worker -Q 
 | **Phase 4: Render** | ✅ | Remotion `Vertical` composition (1080×1920, Ken Burns, word-level highlighted captions, fade-in CTA bar). `POST /render` bundles once, renders, uploads mp4 to S3. Worker `render_video(video_id)` task pulls assets, calls render service, records cost, transitions `pending_render → pending_review`. |
 | **Phase 5: Publisher** | ✅ | `Publisher` ABC + `YouTubeShortsPublisher` (OAuth refresh-token → resumable upload). Worker `publish_video(video_id, platform, visibility)` consumes `approved` videos, persists `Publication`, transitions `approved → publishing → published`. Idempotent on `(video_id, platform)`. |
 | **Phase 6: Analytics & feedback** | ✅ | `snapshot_metrics(publication_id)` scheduled at t+24h/72h/7d at publish time, plus nightly catch-up. `weekly_learnings(niche_id)` (Sun 02:00 UTC) reads top vs bottom decile by views-per-cent, Sonnet writes `niches/{id}/learnings_v1.md` to S3. Script-gen system prompt loads it on next run. Dashboard `/metrics` shows views + likes + cost + margin proxy per video. |
-| Phase 7: Multi-platform | — | IG / TikTok / X / LinkedIn via Buffer or Publer API |
+| **Phase 7: Multi-platform** | ✅ | `BufferPublisher` (Buffer Publishing API v2, upload-media → create-update). Per-niche `persona_json.buffer_profiles` maps `Platform.value → profile_id`. `publish_video_all(video_id, platforms)` task fans out sequentially with per-platform error capture (one failure does not abort the others). CLI: `publish all --platforms ig_reels,tiktok,x,linkedin`. |
 | Phase 8: User-story mode | — | `POST /videos/from-story` skips trends |
 | Phase 9: Full automation | — | Cron + auto-approve heuristic |
 
