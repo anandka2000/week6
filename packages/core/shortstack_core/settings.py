@@ -67,6 +67,16 @@ class Settings(BaseSettings):
     cost_soft_cap_cents: int = Field(default=75, ge=1)
     cost_hard_cap_cents: int = Field(default=100, ge=1)
 
+    # Phase 9 auto-approve heuristic. Failing any gate holds the video at
+    # pending_review; passing all gates flips render_video output straight to
+    # APPROVED so the daily cron can publish without human review.
+    auto_approve_min_duration_sec: float = Field(default=15.0, ge=1.0)
+    auto_approve_max_duration_sec: float = Field(default=60.0, ge=15.0)
+    auto_approve_min_words_per_sec: float = Field(default=1.0, ge=0.0)
+    auto_approve_max_cost_cents: int = Field(default=200, ge=1)
+    auto_approve_flop_threshold_views: int = Field(default=100, ge=0)
+    auto_approve_flop_streak: int = Field(default=3, ge=1)
+
 
 _settings: Settings | None = None
 

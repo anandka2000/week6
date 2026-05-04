@@ -1,6 +1,25 @@
 # Open questions & follow-ups
 
-## Phase 9 (Full automation) — start here next
+## All 9 kickoff phases — done.
+
+Phase status table in `docs/USER_GUIDE.md` is the source of truth. Open
+follow-ups below are non-blocking polish.
+
+## Phase 9 — done
+- [x] `should_auto_approve(...)` heuristic in `packages/core/shortstack_core/quality.py` (duration, caption coverage, cost ceiling, flop streak)
+- [x] `render_video` calls the heuristic; pass → APPROVED, fail → PENDING_REVIEW with reasons in `failure_reason`
+- [x] `daily_pipeline(niche_id, max_videos)` runs the full chain N times honoring `niches.daily_quota`
+- [x] `publish_approved(niche_id, platform, visibility)` — picks up APPROVED videos with no Publication and queues publish
+- [x] Beat: `daily_pipeline_all` 10:00 UTC + `publish_approved_all` 11:00 UTC (1h gap for human override via /review)
+- [x] CLI: `automation daily --niche <slug> [--max N]`, `automation publish-approved --niche <slug>`
+- [x] Make: `make produce NICHE=<slug> [MAX=N]`, `make publish-approved NICHE=<slug>`
+- [x] 11 new tests in `test_quality.py` (every gate fires; flop-streak math) + 6 in `test_automation.py` (registration + beat schedule)
+
+## Phase 9 leftovers (defer; nice-to-have)
+- [ ] Real audio-loudness check via ffmpeg (currently we only proxy via caption coverage)
+- [ ] Make the auto-approve hold-period configurable (default 1h between auto-approve and auto-publish)
+- [ ] Surface `failure_reason="auto_review: ..."` text on the dashboard /review page so the operator sees the heuristic's reasons inline
+- [ ] Per-niche thresholds (overriding the env defaults) — useful if some niches need longer / shorter videos
 - [ ] Cron the trend → script → asset → render pipeline to produce N videos/day per niche (`niches.daily_quota`)
 - [ ] Auto-approve heuristic: caption coverage %, audio LUFS range, duration in range
 - [ ] Manual review only for new niches OR after N consecutive flops

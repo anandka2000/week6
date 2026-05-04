@@ -79,4 +79,19 @@ app.conf.beat_schedule = {
         "task": "shortstack_worker.tasks.analytics.weekly_learnings_all",
         "schedule": crontab(day_of_week="sunday", hour=2, minute=0),
     },
+    # Phase 9: 10:00 UTC daily — produce up to niches.daily_quota videos per
+    # niche. Auto-approve heuristic in render_video gates which ones skip
+    # /review. 1h gap before publish_approved_all gives the operator a
+    # chance to reject before the upload fires.
+    "automation-daily-pipeline": {
+        "task": "shortstack_worker.tasks.automation.daily_pipeline_all",
+        "schedule": crontab(hour=10, minute=0),
+    },
+    # Phase 9: 11:00 UTC daily — publish APPROVED videos that don't yet have
+    # a YouTube Publication. Visible in /review for the 1h gap so an operator
+    # can flip them back to FAILED if the heuristic was wrong.
+    "automation-publish-approved": {
+        "task": "shortstack_worker.tasks.automation.publish_approved_all",
+        "schedule": crontab(hour=11, minute=0),
+    },
 }

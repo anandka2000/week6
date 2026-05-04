@@ -1,4 +1,4 @@
-.PHONY: up down install dev worker beat render render-video publish publish-all snapshot learnings migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
+.PHONY: up down install dev worker beat render render-video publish publish-all snapshot learnings produce publish-approved migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
 
 up:
 	docker compose --env-file .env -f infra/docker-compose.yml up -d
@@ -71,6 +71,12 @@ snapshot:
 
 learnings:
 	uv run python -m shortstack_worker.cli analytics learnings --niche $(NICHE)
+
+produce:
+	uv run python -m shortstack_worker.cli automation daily --niche $(NICHE) $(if $(MAX),--max $(MAX),)
+
+publish-approved:
+	uv run python -m shortstack_worker.cli automation publish-approved --niche $(NICHE) $(if $(PLATFORM),--platform $(PLATFORM),) $(if $(VISIBILITY),--visibility $(VISIBILITY),)
 
 NICHE ?= ai-productivity
 

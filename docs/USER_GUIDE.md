@@ -183,6 +183,19 @@ The voice itself is **per-niche**, on `persona_json.voice_id`. Don't put a voice
 | `COST_SOFT_CAP_CENTS` | `75` | logged warn when video.cost_cents exceeds this |
 | `COST_HARD_CAP_CENTS` | `100` | hard kill — task raises `CostCapExceeded`, video → failed |
 
+### Phase 9 auto-approve thresholds
+
+These gate `render_video`'s output. Failing any one holds the video at `pending_review`; passing all of them flips it to `approved` so the daily cron's `publish_approved_all` can publish without human review.
+
+| key | default | notes |
+|---|---|---|
+| `AUTO_APPROVE_MIN_DURATION_SEC` | `15.0` | shorter than this and YouTube Shorts deprioritises it |
+| `AUTO_APPROVE_MAX_DURATION_SEC` | `60.0` | YouTube Shorts hard cap |
+| `AUTO_APPROVE_MIN_WORDS_PER_SEC` | `1.0` | caption coverage proxy — under 1 wps means the captions barely cover the audio |
+| `AUTO_APPROVE_MAX_COST_CENTS` | `200` | sanity ceiling on rolling per-video cost |
+| `AUTO_APPROVE_FLOP_THRESHOLD_VIEWS` | `100` | a "flop" is fewer than this many views at the latest snapshot |
+| `AUTO_APPROVE_FLOP_STREAK` | `3` | this many consecutive flops in the niche → fall back to manual review |
+
 The **per-niche** column `niches.cost_cap_cents` (default `100`) overrides the env default for that niche. The env vars are the global fallback used by tests and tools that don't have a niche in scope.
 
 ---
@@ -517,6 +530,6 @@ make worker   # equivalent to: celery -A shortstack_worker.celery_app worker -Q 
 | **Phase 6: Analytics & feedback** | ✅ | `snapshot_metrics(publication_id)` scheduled at t+24h/72h/7d at publish time, plus nightly catch-up. `weekly_learnings(niche_id)` (Sun 02:00 UTC) reads top vs bottom decile by views-per-cent, Sonnet writes `niches/{id}/learnings_v1.md` to S3. Script-gen system prompt loads it on next run. Dashboard `/metrics` shows views + likes + cost + margin proxy per video. |
 | **Phase 7: Multi-platform** | ✅ | `BufferPublisher` (Buffer Publishing API v2, upload-media → create-update). Per-niche `persona_json.buffer_profiles` maps `Platform.value → profile_id`. `publish_video_all(video_id, platforms)` task fans out sequentially with per-platform error capture (one failure does not abort the others). CLI: `publish all --platforms ig_reels,tiktok,x,linkedin`. |
 | **Phase 8: User-story mode** | ✅ | `POST /videos/from-story` (sync `201 Created`) accepts `{niche_slug, story_text}`. `_generate(...)` extracted from `generate_script` and shared with `generate_script_from_story(niche_id, story_text)`. Dashboard `/stories` page: niche selector + 5000-char textarea + deep-link to the resulting `/videos?niche=<slug>`. |
-| Phase 9: Full automation | — | Cron + auto-approve heuristic |
+| **Phase 9: Full automation** | ✅ | `should_auto_approve(...)` heuristic gate in `render_video`: duration in `[15,60]s`, ≥1.0 caption words/sec, cost under sanity ceiling, niche not on a 3-video flop streak. Pass → status `APPROVED`; fail → `PENDING_REVIEW` with reasons in `failure_reason`. `daily_pipeline(niche_id)` runs trends→script→assets→render up to `niches.daily_quota` per day. Beat: `daily_pipeline_all` (10:00 UTC) + `publish_approved_all` (11:00 UTC, 1h gap for human override). |
 
 See `TODO.md` for the live punch-list.

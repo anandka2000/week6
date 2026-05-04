@@ -12,7 +12,7 @@
 
 ## TL;DR (read this paragraph first)
 
-**ShortStack** is an AI short-video pipeline for the brand **Trending Tech**: pick trends → write script (Sonnet 4.6) → generate visuals + voiceover + captions → render 9:16 mp4 → manual approval → upload to YouTube Shorts → pull metrics → feed top-performer learnings back into the script prompt. Phases 1–6 of the kickoff plan are **done and pushed**. The full pipeline closes the feedback loop. **Phase 7 (Buffer/Publer multi-platform) is the next entry point.** As of this snapshot the user is mid-setup of a local Linux dev box; the code itself is unblocked.
+**ShortStack** is an AI short-video pipeline for the brand **Trending Tech**: pick trends → write script (Sonnet 4.6) → generate visuals + voiceover + captions → render 9:16 mp4 → optional auto-approve gate → upload to YouTube Shorts (or fan out via Buffer to IG/TikTok/X/LinkedIn) → pull metrics → feed top-performer learnings back into the script prompt. **All 9 kickoff phases are done and pushed.** A daily cron produces N videos per niche per day, an auto-approve heuristic gates publishing, and the human-review queue is reserved for new niches or flop streaks. Open work is non-blocking polish (live Buffer-shape verification, ffmpeg loudness, dashboard surfacing of held-for-review reasons).
 
 ---
 
@@ -23,7 +23,7 @@
 | Sandbox repo (where Claude works) | `https://github.com/anandka2000/week6` |
 | Sandbox branch | `claude/shortstack-mvp-plan-CCjGq` |
 | Mirror repo (canonical) | `https://github.com/anandka2000/videogen` (mapped to `main`) |
-| Latest commit on sandbox branch | `90fed41` |
+| Latest commit on sandbox branch | `<this commit>` (Phase 9 + final QA pass) |
 | Local clone path on user's laptop | `/Users/anaagarw/shortstack` (Mac); planning a fresh Linux box too |
 
 **Sandbox cannot push to videogen** — local proxy is hard-restricted to week6. The user mirrors from their laptop:
@@ -47,6 +47,11 @@ alias mirror-shortstack='cd /Users/anaagarw/shortstack && \
 
 | Commit | What landed |
 |---|---|
+| `<this>` | Phase 9 — auto-approve heuristic + `daily_pipeline` + `publish_approved` + beat schedule |
+| `991d3df` | fix: QA1 + QA2 findings (CLI hardening, StoryIn whitespace, dashboard 422 parsing) |
+| `33c50e2` | Phase 8 — user-story mode (`POST /videos/from-story` + dashboard /stories) |
+| `413e6cb` | Phase 7 — `BufferPublisher` + `publish_video_all` multi-platform fan-out |
+| `e8ae68f` | docs: PROJECT_STATUS.md session-handoff snapshot |
 | `90fed41` | Phase 6 — snapshots + weekly learnings + dashboard `/metrics` |
 | `51ebafe` | Phase 5 — `YouTubeShortsPublisher` + `publish_video` worker task |
 | `b2cbac0` | Phase 4 — Remotion `Vertical` composition + `render_video` task |
@@ -83,9 +88,9 @@ alias mirror-shortstack='cd /Users/anaagarw/shortstack && \
 | **Phase 4: Render** | ✅ | Remotion Vertical 1080×1920, Ken Burns, word-level captions, fade-in CTA, mp4 → S3 |
 | **Phase 5: Publisher** | ✅ | YouTube Shorts via OAuth refresh-token + resumable upload |
 | **Phase 6: Analytics + feedback** | ✅ | `snapshot_metrics` (t+24h/72h/7d), `weekly_learnings` Sonnet → S3, script-gen loads it on next run |
-| Phase 7: Multi-platform | ⏳ next | IG/TikTok/X/LinkedIn via Buffer or Publer API |
-| Phase 8: User-story mode | — | `POST /videos/from-story` skips trends |
-| Phase 9: Full automation | — | Cron + auto-approve heuristic |
+| **Phase 7: Multi-platform** | ✅ | `BufferPublisher` + `publish_video_all` sequential fan-out for IG/TikTok/X/LinkedIn |
+| **Phase 8: User-story mode** | ✅ | `POST /videos/from-story` (sync) + dashboard `/stories` page |
+| **Phase 9: Full automation** | ✅ | `should_auto_approve` heuristic in render_video + `daily_pipeline_all` + `publish_approved_all` beat schedule |
 
 ---
 
@@ -110,10 +115,11 @@ pending_assets → pending_render → pending_review → APPROVE → approved �
 
 ## What's already running cleanly
 
-- **86+ tests pass** (`uv run pytest` — pure unit tests, no DB or network).
+- **162 tests pass** (`uv run pytest` — pure unit tests, no DB or network).
 - All `.py` parses cleanly via `ast`.
 - TypeScript: `apps/render` and `apps/dashboard` both `tsc --noEmit` clean.
-- 6 commits ago: tester agent gave it 7/10 confidence; fixer agent shipped both rounds of fixes.
+- Phase 7 + Phase 8 audited by parallel QA agents (7/10 + 8/10 confidence); fixer pass shipped (`991d3df`).
+- All 9 kickoff phases delivered. Pipeline closes the feedback loop end-to-end.
 
 ---
 
@@ -155,16 +161,19 @@ The user is setting up two machines:
 
 ---
 
-## What I should do next ("Phase 7 go" → me)
+## What I should do next
 
-Per the kickoff prompt and TODO.md, Phase 7 is **multi-platform publishing via Buffer or Publer**:
+The 9 kickoff phases are done. The natural next steps are non-blocking polish work tracked in `TODO.md`:
 
-- Add `BufferPublisher` (or `PublerPublisher`) implementing the same `Publisher` ABC at `packages/publishers/shortstack_publishers/`.
-- Schedule slots per platform per niche; respect Buffer's rate limits + their own approval queue.
-- Wire IG / TikTok / X / LinkedIn through the new publisher.
-- Extend `publish_video` task to accept multi-platform fan-out (one upload per `Publication` row, possibly via `group()` or sequential).
+- **Live Buffer API verification** — every endpoint shape is documented as an assumption in `DECISIONS.md`. First real upload will surface mismatches; reconcile then.
+- **YouTube Analytics API** — the schema reserves `avg_view_duration_sec`, `retention_curve`, `ctr` columns; only the Data API counts are populated today.
+- **ffmpeg LUFS check** in `should_auto_approve` — currently caption coverage is the proxy.
+- **Dashboard surfacing of `failure_reason="auto_review: ..."`** so operators see the gate's reasons inline at `/review`.
+- **Per-niche threshold overrides** — env-level defaults work for v0; persona-level overrides come when niches drift apart in length/style.
 
-**Plan-then-execute pattern:** propose the plan in 1–2 paragraphs, list 2–3 design questions (e.g. Buffer vs Publer; schedule per platform vs immediate), wait for "go", then ship in one commit.
+If the operator wants new functionality, common asks would be: A/B testing per niche, multi-template render variants, music tracks under voiceover, billing / quota dashboard, accounts/auth on the dashboard.
+
+**Plan-then-execute pattern:** propose the plan in 1–2 paragraphs, list 2–3 design questions, wait for "go", then ship in one commit and update this file.
 
 ---
 

@@ -29,8 +29,17 @@ from shortstack_core.cost import (
     check_video_cap,
     record_cost,
 )
-from shortstack_core.db import Asset, Niche, Script, Video, session_scope
+from shortstack_core.db import (
+    Asset,
+    MetricSnapshot,
+    Niche,
+    Publication,
+    Script,
+    Video,
+    session_scope,
+)
 from shortstack_core.enums import AssetKind, CostKind, VideoStatus
+from shortstack_core.quality import should_auto_approve
 from shortstack_core.schemas import CaptionsDoc, ScriptDraft
 from shortstack_core.settings import get_settings
 from shortstack_core.storage import download_bytes, signed_url
@@ -44,6 +53,34 @@ RENDER_COST_PER_SEC_USD = 0.001
 
 # Signed-URL TTL handed to Remotion. 1h is plenty for a single render.
 SIGNED_URL_TTL_SEC = 3600
+
+
+def _recent_views_for_niche(session, niche_id: UUID, *, limit: int = 10) -> list[int]:
+    """Return latest-snapshot ``views`` for the most-recently-published videos
+    in this niche, most recent first. Empty list when the niche has no
+    metrics yet.
+    """
+    from sqlalchemy import desc, func, select
+
+    latest_subq = (
+        select(
+            MetricSnapshot.publication_id,
+            func.max(MetricSnapshot.captured_at).label("latest"),
+        )
+        .group_by(MetricSnapshot.publication_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(MetricSnapshot.views)
+        .join(Publication, Publication.id == MetricSnapshot.publication_id)
+        .join(Video, Video.id == Publication.video_id)
+        .join(latest_subq, latest_subq.c.publication_id == Publication.id)
+        .where(MetricSnapshot.captured_at == latest_subq.c.latest)
+        .where(Video.niche_id == niche_id)
+        .order_by(desc(Publication.published_at))
+        .limit(limit)
+    ).scalars().all()
+    return [int(v) for v in rows]
 
 
 def _build_render_request(
@@ -175,6 +212,10 @@ def render_video(video_id: str) -> dict[str, Any]:
     render_sec = render_ms / 1000.0
     cost_cents = Decimal(str(RENDER_COST_PER_SEC_USD * render_sec)) * Decimal("100")
 
+    rendered_duration = float(
+        result.get("duration_sec", float(draft.total_duration_sec))
+    )
+
     try:
         with session_scope() as s:
             video = s.get(Video, video_uuid)
@@ -195,10 +236,40 @@ def render_video(video_id: str) -> dict[str, Any]:
             )
             check_video_cap(s, video_id=video_uuid, hard_cap_cents=cost_cap)
             video.s3_key_mp4 = s3_key
-            video.duration_sec = Decimal(
-                str(result.get("duration_sec", float(draft.total_duration_sec)))
+            video.duration_sec = Decimal(str(rendered_duration))
+
+            # Phase 9 auto-approve gate. Pull the niche's recent video views
+            # (latest snapshot per published video) so the flop-streak check
+            # can fire. New niches with no metrics fall through to the
+            # caption-coverage / duration / cost checks.
+            recent_views = _recent_views_for_niche(s, niche_id)
+            decision = should_auto_approve(
+                duration_sec=rendered_duration,
+                caption_word_count=len(captions_doc.words),
+                cost_cents=int(video.cost_cents),
+                recent_video_views=recent_views,
             )
-            video.status = VideoStatus.PENDING_REVIEW
+            if decision.approved:
+                video.status = VideoStatus.APPROVED
+                video.failure_reason = None
+                log.info(
+                    "render_video.auto_approved",
+                    extra={"video_id": video_id, "duration_sec": rendered_duration},
+                )
+            else:
+                video.status = VideoStatus.PENDING_REVIEW
+                # Surface the held-for-review reasons via the same
+                # failure_reason column. Dashboard /review can render them
+                # as the "why is this here?" hint.
+                video.failure_reason = "auto_review: " + " | ".join(decision.reasons)
+                log.info(
+                    "render_video.held_for_review",
+                    extra={
+                        "video_id": video_id,
+                        "duration_sec": rendered_duration,
+                        "reasons": decision.reasons,
+                    },
+                )
     except CostCapExceeded:
         # Render already paid for; mark failed so we don't continue down the
         # pipeline, but keep the mp4 reference for forensics.
