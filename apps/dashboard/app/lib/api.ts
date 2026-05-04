@@ -84,6 +84,29 @@ export const metricsByVideo = (slug: string, limit = 50) =>
     `/metrics/by-video?niche=${encodeURIComponent(slug)}&limit=${limit}`,
   );
 
+async function _readApiError(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    // FastAPI Pydantic validation error: detail is an array of {loc, msg, type, ...}
+    if (Array.isArray(body?.detail)) {
+      return body.detail
+        .map((d: { loc?: unknown[]; msg?: string }) => {
+          const where = Array.isArray(d.loc) ? d.loc.join(".") : "";
+          return where ? `${where}: ${d.msg ?? "invalid"}` : (d.msg ?? "invalid");
+        })
+        .join("; ");
+    }
+    if (typeof body?.detail === "string") return body.detail;
+    return JSON.stringify(body);
+  } catch {
+    try {
+      return await res.text();
+    } catch {
+      return `(unparseable ${res.status} body)`;
+    }
+  }
+}
+
 export async function submitStory(
   nicheSlug: string,
   storyText: string,
@@ -95,7 +118,7 @@ export async function submitStory(
   });
   if (!res.ok) {
     throw new Error(
-      `POST /videos/from-story -> ${res.status}: ${await res.text()}`,
+      `POST /videos/from-story (${res.status}): ${await _readApiError(res)}`,
     );
   }
   return res.json() as Promise<StoryAccepted>;

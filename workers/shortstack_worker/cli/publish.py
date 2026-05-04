@@ -6,6 +6,8 @@ import json
 
 import typer
 
+from shortstack_core.enums import Platform
+
 from ..tasks import publish as publish_tasks
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -32,5 +34,18 @@ def all_(
 ) -> None:
     """Fan an approved video out to multiple platforms in one call."""
     plats = [p.strip() for p in platforms.split(",") if p.strip()]
+    if not plats:
+        raise typer.BadParameter(
+            "--platforms must contain at least one slug",
+            param_hint="--platforms",
+        )
+    valid = {p.value for p in Platform}
+    invalid = [p for p in plats if p not in valid]
+    if invalid:
+        raise typer.BadParameter(
+            f"unknown platform slug(s): {', '.join(invalid)}. "
+            f"valid: {', '.join(sorted(valid))}",
+            param_hint="--platforms",
+        )
     result = publish_tasks.publish_video_all.run(video_id, plats, visibility)
     typer.echo(json.dumps(result, indent=2, default=str))

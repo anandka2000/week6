@@ -17,8 +17,11 @@ export function StoryForm({ niches }: { niches: NicheOpt[] }) {
   const [result, setResult] = useState<StoryAccepted | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // QA fix: the helper text used to hide on an empty textarea, leaving the
+  // operator with a disabled submit button and no UI cue why. Showing the
+  // "need at least N chars" hint from char 0 is clearer.
   const charCount = storyText.length;
-  const tooShort = charCount > 0 && charCount < MIN_LEN;
+  const tooShort = charCount < MIN_LEN;
   const disabled = pending || charCount < MIN_LEN || charCount > MAX_LEN || !slug;
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {

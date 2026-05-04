@@ -9,7 +9,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shortstack_core.enums import (
     Platform,
@@ -78,8 +78,30 @@ class DailyCost(BaseModel):
 
 
 class StoryIn(BaseModel):
-    niche_slug: str
-    story_text: str = Field(min_length=10, max_length=5000)
+    """Operator-supplied story for Phase 8 ``POST /videos/from-story``.
+
+    ``story_text`` is stripped before length checks so that a story padded
+    with whitespace can't slip past via either side of the boundary (the
+    worker helper also strips; this aligns the two layers — see
+    ``DECISIONS.md`` Phase 8 / QA fixer pass).
+    """
+
+    niche_slug: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$")
+    story_text: str = Field(min_length=1, max_length=10_000)
+
+    @field_validator("story_text", mode="after")
+    @classmethod
+    def _strip_and_bound(cls, v: str) -> str:
+        stripped = v.strip()
+        if len(stripped) < 10:
+            raise ValueError(
+                f"story_text must be at least 10 chars after stripping (got {len(stripped)})"
+            )
+        if len(stripped) > 5000:
+            raise ValueError(
+                f"story_text must be at most 5000 chars after stripping (got {len(stripped)})"
+            )
+        return stripped
 
 
 class StoryAccepted(BaseModel):

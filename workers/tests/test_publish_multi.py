@@ -113,3 +113,41 @@ def test_publish_video_all_with_empty_platforms_returns_empty_lists():
         out = publish_video_all.run("vid-4", [], "unlisted")
     mocked.assert_not_called()
     assert out == {"video_id": "vid-4", "results": [], "errors": []}
+
+
+# --- CLI hardening (QA fixer pass) ---
+
+
+def test_cli_publish_all_rejects_empty_platforms():
+    """``--platforms ""`` (empty after stripping) used to silently no-op.
+    The CLI must now raise a typer ``BadParameter`` before dispatching.
+    """
+    from typer.testing import CliRunner
+
+    from shortstack_worker.cli import app
+
+    runner = CliRunner()
+    res = runner.invoke(
+        app, ["publish", "all", "--video-id", "v1", "--platforms", "  ,  ,"]
+    )
+    assert res.exit_code != 0
+    assert "at least one slug" in res.output
+
+
+def test_cli_publish_all_rejects_unknown_platform_slug():
+    """A typo in --platforms (e.g. ``instagram`` instead of ``ig_reels``)
+    must fail fast with a clear message, not a generic deep-stack ValueError.
+    """
+    from typer.testing import CliRunner
+
+    from shortstack_worker.cli import app
+
+    runner = CliRunner()
+    res = runner.invoke(
+        app, ["publish", "all", "--video-id", "v1", "--platforms", "instagram"]
+    )
+    assert res.exit_code != 0
+    assert "unknown platform slug" in res.output
+    assert "instagram" in res.output
+    # The error should also list valid choices.
+    assert "ig_reels" in res.output

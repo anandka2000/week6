@@ -92,3 +92,50 @@ def test_generate_script_from_story_validates_length_before_db():
         generate_script_from_story.run(
             "00000000-0000-0000-0000-000000000000", "x" * (STORY_MAX_LEN + 1)
         )
+
+
+# --- API-layer validation (QA fixer pass) ---
+
+
+def test_story_in_strips_before_length_check():
+    """QA fix: Pydantic ``StoryIn`` and the worker helper used to disagree on
+    whitespace boundaries. Both now strip-then-check; the API rejects a
+    whitespace-padded too-short string consistently with the worker.
+    """
+    from pydantic import ValidationError
+
+    from shortstack_api.serializers import StoryIn
+
+    # 8 real chars + 4 spaces = 12 raw chars. Pre-fix: Pydantic accepted (>=10),
+    # worker rejected (<10 stripped). Post-fix: Pydantic rejects.
+    with pytest.raises(ValidationError):
+        StoryIn(niche_slug="ai-productivity", story_text="hi there  ")
+
+    # A valid story with surrounding whitespace is normalized to the stripped
+    # form so the worker doesn't see leading/trailing spaces.
+    obj = StoryIn(
+        niche_slug="ai-productivity",
+        story_text="   This is a long enough story for ShortStack.   ",
+    )
+    assert obj.story_text.startswith("This")
+    assert obj.story_text.endswith("ShortStack.")
+
+
+def test_story_in_rejects_invalid_niche_slug():
+    """Slug must match ``[a-z0-9-]+`` and be 1..64 chars."""
+    from pydantic import ValidationError
+
+    from shortstack_api.serializers import StoryIn
+
+    valid_text = "x" * 50
+    with pytest.raises(ValidationError):
+        StoryIn(niche_slug="UPPERCASE", story_text=valid_text)
+    with pytest.raises(ValidationError):
+        StoryIn(niche_slug="bad slug with spaces", story_text=valid_text)
+    with pytest.raises(ValidationError):
+        StoryIn(niche_slug="x" * 100, story_text=valid_text)
+    with pytest.raises(ValidationError):
+        StoryIn(niche_slug="", story_text=valid_text)
+    # Valid ones pass.
+    StoryIn(niche_slug="ai-productivity", story_text=valid_text)
+    StoryIn(niche_slug="no-code-tools-2", story_text=valid_text)
