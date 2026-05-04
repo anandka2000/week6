@@ -75,3 +75,15 @@ class PublicationRead(BaseModel):
 class DailyCost(BaseModel):
     day: date
     total_cents: float = Field(description="sum of cost_events.cost_cents for that day")
+
+
+class StoryIn(BaseModel):
+    niche_slug: str
+    story_text: str = Field(min_length=10, max_length=5000)
+
+
+class StoryAccepted(BaseModel):
+    script_id: UUID
+    video_id: UUID
+    estimate_cents: float
+    status: VideoStatus

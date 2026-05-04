@@ -1,11 +1,21 @@
 # Open questions & follow-ups
 
-## Phase 8 (User-story mode) — landing in the next commit alongside Phase 7
-
-## Phase 9 (Full automation) — after Phase 8 lands
+## Phase 9 (Full automation) — start here next
 - [ ] Cron the trend → script → asset → render pipeline to produce N videos/day per niche (`niches.daily_quota`)
 - [ ] Auto-approve heuristic: caption coverage %, audio LUFS range, duration in range
 - [ ] Manual review only for new niches OR after N consecutive flops
+
+## Phase 8 — done
+- [x] `_generate(...)` extracted from `generate_script` as the shared Sonnet + persist helper (mode-aware, preserves trend-mode contract)
+- [x] `generate_script_from_story(niche_id, story_text)` Celery task with 10–5000 char validation
+- [x] `_build_story_payload(story_text)` pure helper for the trend-shaped payload (`source="story"`, title=first 80 chars)
+- [x] `POST /videos/from-story` API endpoint (sync, `201 Created`, returns `{script_id, video_id, estimate_cents, status}`)
+- [x] Dashboard `/stories` page + client `StoryForm` (char counter, niche dropdown, deep-link to /videos)
+- [x] Tests: 9 new in `test_stories.py`; existing `test_scripts.py` (6) all pass after the refactor
+
+## Phase 8 leftovers (defer; nice-to-have)
+- [ ] Dashboard error UX: parse FastAPI `detail[].msg` instead of showing raw 422 body
+- [ ] Decide whether `from_story` should kick off Celery `apply_async` for long stories rather than `.run` (currently sync; operator gets the video_id immediately)
 
 ## Phase 7 — done
 - [x] `BufferPublisher` (Buffer Publishing API v2: upload-media → create-update; per-niche profile_id)

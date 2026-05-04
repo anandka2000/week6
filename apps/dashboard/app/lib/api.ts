@@ -52,6 +52,13 @@ export type Video = {
 
 export type DailyCost = { day: string; total_cents: number };
 
+export type StoryAccepted = {
+  script_id: string;
+  video_id: string;
+  estimate_cents: number;
+  status: string;
+};
+
 export type VideoMetricRollup = {
   video_id: string;
   status: string;
@@ -76,3 +83,20 @@ export const metricsByVideo = (slug: string, limit = 50) =>
   get<VideoMetricRollup[]>(
     `/metrics/by-video?niche=${encodeURIComponent(slug)}&limit=${limit}`,
   );
+
+export async function submitStory(
+  nicheSlug: string,
+  storyText: string,
+): Promise<StoryAccepted> {
+  const res = await fetch(`${API_BASE}/videos/from-story`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ niche_slug: nicheSlug, story_text: storyText }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `POST /videos/from-story -> ${res.status}: ${await res.text()}`,
+    );
+  }
+  return res.json() as Promise<StoryAccepted>;
+}

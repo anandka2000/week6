@@ -4,6 +4,11 @@
                                row. Reprompts up to MAX_REPROMPTS times on
                                Pydantic validation failure. Records one
                                cost_event per Sonnet call.
+
+  generate_script_from_story(niche_id, story_text) -> Phase 8 entry-point that
+                               skips trend discovery: the operator supplies the
+                               story text directly, then the same Sonnet +
+                               persist path runs.
 """
 
 from __future__ import annotations
@@ -34,6 +39,9 @@ PROMPT_VERSION = "scripts_v1"
 SCRIPT_MODEL = "claude-sonnet-4-6"
 MAX_REPROMPTS = 2  # initial attempt + 2 retries = 3 total Sonnet calls
 
+STORY_MIN_LEN = 10
+STORY_MAX_LEN = 5000
+
 
 def _user_message(persona: NichePersona, trend_payload: dict[str, Any]) -> str:
     return json.dumps(
@@ -59,29 +67,51 @@ def _validate_payload(text: str) -> ScriptDraft:
     return ScriptDraft.model_validate(payload)
 
 
-@shared_task(
-    name="shortstack_worker.tasks.scripts.generate",
-    autoretry_for=(),  # No retry on the task; reprompt loop handles transient JSON issues.
-    acks_late=True,
-)
-def generate_script(trend_id: str) -> dict[str, Any]:
-    trend_uuid = UUID(trend_id)
+def _build_story_payload(story_text: str) -> dict[str, Any]:
+    """Build a trend-shaped payload from operator-supplied story text.
 
+    Pure helper; raises ``ValueError`` if ``story_text`` is outside the
+    accepted length bounds. Title is the first 80 chars of the (stripped)
+    story; summary is the full story text.
+    """
+    if not isinstance(story_text, str):
+        raise ValueError(f"story_text must be a string, got {type(story_text).__name__}")
+    stripped = story_text.strip()
+    if len(stripped) < STORY_MIN_LEN:
+        raise ValueError(
+            f"story_text must be at least {STORY_MIN_LEN} chars (got {len(stripped)})"
+        )
+    if len(stripped) > STORY_MAX_LEN:
+        raise ValueError(
+            f"story_text must be at most {STORY_MAX_LEN} chars (got {len(stripped)})"
+        )
+    return {
+        "title": stripped[:80].strip(),
+        "summary": stripped,
+        "source": "story",
+        "url": None,
+    }
+
+
+def _generate(
+    *,
+    niche_id: UUID,
+    trend_payload: dict[str, Any],
+    mode: ScriptMode,
+    input_text: str | None = None,
+    trend_id: UUID | None = None,
+) -> dict[str, Any]:
+    """Shared Sonnet call + Script + Video persist path.
+
+    Used by both ``generate_script`` (trend mode) and
+    ``generate_script_from_story`` (story mode). Caller is responsible for
+    building the ``trend_payload`` dict and choosing the ``mode``.
+    """
     with session_scope() as s:
-        trend = s.get(Trend, trend_uuid)
-        if trend is None:
-            raise ValueError(f"trend {trend_id} not found")
-        niche = s.get(Niche, trend.niche_id)
+        niche = s.get(Niche, niche_id)
         if niche is None:
-            raise ValueError(f"niche {trend.niche_id} for trend {trend_id} not found")
+            raise ValueError(f"niche {niche_id} not found")
         persona = NichePersona.model_validate(niche.persona_json)
-        trend_payload = {
-            "title": trend.title,
-            "summary": trend.summary or "",
-            "source": trend.source.value if hasattr(trend.source, "value") else str(trend.source),
-            "url": trend.url,
-        }
-        niche_id = niche.id
         cost_cap = niche.cost_cap_cents
 
     system = load_prompt("scripts_v1.md")
@@ -101,6 +131,8 @@ def generate_script(trend_id: str) -> dict[str, Any]:
     draft: ScriptDraft | None = None
     last_error: str | None = None
 
+    log_id = str(trend_id) if trend_id is not None else None
+
     for attempt in range(MAX_REPROMPTS + 1):
         resp = call_messages(
             model=SCRIPT_MODEL,
@@ -113,7 +145,9 @@ def generate_script(trend_id: str) -> dict[str, Any]:
         log.info(
             "generate_script.attempt",
             extra={
-                "trend_id": trend_id,
+                "mode": mode.value,
+                "trend_id": log_id,
+                "niche_id": str(niche_id),
                 "attempt": attempt,
                 "input_tokens": resp.usage.input_tokens,
                 "output_tokens": resp.usage.output_tokens,
@@ -152,9 +186,10 @@ def generate_script(trend_id: str) -> dict[str, Any]:
                     cache_write_tokens=u.cache_write_tokens,
                     meta={
                         "task": "generate_script",
+                        "mode": mode.value,
                         "attempt": i,
                         "prompt_version": PROMPT_VERSION,
-                        "trend_id": trend_id,
+                        "trend_id": log_id,
                     },
                 )
         raise ValueError(
@@ -165,9 +200,10 @@ def generate_script(trend_id: str) -> dict[str, Any]:
 
     with session_scope() as s:
         script = Script(
-            trend_id=trend_uuid,
+            trend_id=trend_id,
             niche_id=niche_id,
-            mode=ScriptMode.TREND,
+            mode=mode,
+            input_text=input_text,
             draft_json=draft.model_dump(),
             prompt_version=PROMPT_VERSION,
             status=ScriptStatus.VALIDATED,
@@ -209,9 +245,10 @@ def generate_script(trend_id: str) -> dict[str, Any]:
                 video_id=video_id,
                 meta={
                     "task": "generate_script",
+                    "mode": mode.value,
                     "attempt": i,
                     "prompt_version": PROMPT_VERSION,
-                    "trend_id": trend_id,
+                    "trend_id": log_id,
                 },
             )
 
@@ -224,4 +261,59 @@ def generate_script(trend_id: str) -> dict[str, Any]:
             "failure_reason": failure_reason,
             "draft": draft.model_dump(),
             "attempts": len(usages),
+            "mode": mode.value,
         }
+
+
+@shared_task(
+    name="shortstack_worker.tasks.scripts.generate",
+    autoretry_for=(),  # No retry on the task; reprompt loop handles transient JSON issues.
+    acks_late=True,
+)
+def generate_script(trend_id: str) -> dict[str, Any]:
+    trend_uuid = UUID(trend_id)
+
+    with session_scope() as s:
+        trend = s.get(Trend, trend_uuid)
+        if trend is None:
+            raise ValueError(f"trend {trend_id} not found")
+        niche = s.get(Niche, trend.niche_id)
+        if niche is None:
+            raise ValueError(f"niche {trend.niche_id} for trend {trend_id} not found")
+        trend_payload = {
+            "title": trend.title,
+            "summary": trend.summary or "",
+            "source": trend.source.value if hasattr(trend.source, "value") else str(trend.source),
+            "url": trend.url,
+        }
+        niche_id = niche.id
+
+    return _generate(
+        niche_id=niche_id,
+        trend_payload=trend_payload,
+        mode=ScriptMode.TREND,
+        trend_id=trend_uuid,
+    )
+
+
+@shared_task(
+    name="shortstack_worker.tasks.scripts.generate_from_story",
+    autoretry_for=(),
+    acks_late=True,
+)
+def generate_script_from_story(niche_id: str, story_text: str) -> dict[str, Any]:
+    """Phase 8: skip trend discovery. Operator supplies the story directly.
+
+    Validates the story text length, builds a trend-shaped payload, and runs
+    the same Sonnet + persist path as ``generate_script``. The resulting
+    ``Script`` row has ``mode = ScriptMode.STORY`` and ``input_text`` set to
+    the original story text; ``trend_id`` is NULL.
+    """
+    niche_uuid = UUID(niche_id)
+    story_payload = _build_story_payload(story_text)
+    return _generate(
+        niche_id=niche_uuid,
+        trend_payload=story_payload,
+        mode=ScriptMode.STORY,
+        input_text=story_text,
+    )

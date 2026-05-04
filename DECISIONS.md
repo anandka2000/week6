@@ -136,6 +136,47 @@ Loaded lazily via `lru_cache`. Cheap enough to run on the worker box
 and ~150MB model footprint. We can swap to `small.en` if accuracy
 matters, or to GPU if throughput becomes a problem. No need yet.
 
+## 2026-05-02 — Phase 8 (user-story mode)
+
+### `_generate(...)` is the shared persist path; `generate_script` is a thin wrapper
+The previous `generate_script(trend_id)` body did three things: load the
+trend, call Sonnet (with reprompt loop), persist Script + Video. We
+extracted (2) + (3) into a private `_generate(*, niche_id, trend_payload,
+mode, input_text=None, trend_id=None)` and `generate_script` became a
+thin wrapper that does (1) and delegates. Story mode uses the same
+helper with `mode=ScriptMode.STORY`. Trade-off: small refactor of an
+existing-tested codepath; verified against the existing 6 test cases
+which all still pass.
+
+### `_build_story_payload` enforces 10–5000 chars at the helper boundary
+Pydantic's `Field(min_length=10, max_length=5000)` on `StoryIn` catches
+bad input at the API boundary and returns 422. The pure helper repeats
+the check so direct callers (CLI, tests, future task callers) get the
+same `ValueError` regardless of entry path. Trade-off: validation is in
+two places; preferred over silent truncation or boundary-only checks.
+
+### `POST /videos/from-story` is sync, not enqueued
+We call `generate_script_from_story.run(...)` synchronously so the API
+can return the resulting `{script_id, video_id, estimate_cents}` to the
+operator immediately and the dashboard can deep-link to `/videos`. A
+typical script-gen call is 3–8 seconds (Sonnet + reprompt budget) which
+is acceptable for an interactive operator flow. If we ever take stories
+from end users (not operators), switch to `apply_async` and return a
+task_id.
+
+### `Script.mode` and `Script.input_text` are first-class
+Both columns existed in the schema since Day 2 but nothing wrote to
+them. Story mode now writes `mode=STORY` + `input_text=story_text` so
+analytics and learnings can later filter by entry mode if we see
+mode-specific performance patterns.
+
+### Dashboard form is a Client Component; the page is a Server Component
+`apps/dashboard/app/stories/page.tsx` is a server component that fetches
+niches and passes them as props to `<StoryForm>` (client). The form
+owns the submit lifecycle (`useState` + `useTransition`) and shows the
+result inline. Standard Next.js 14 App Router pattern; matches what
+`/review` already does.
+
 ## 2026-05-02 — Phase 7 (multi-platform via Buffer)
 
 ### Buffer over Publer

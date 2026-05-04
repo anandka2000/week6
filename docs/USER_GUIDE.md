@@ -408,6 +408,7 @@ All commands run **inline** (`task.run(...)`) — no celery worker required. For
 | `/trends?niche=<slug>` | Last-48h trends, hook score badges (≥8 green / 5–7 amber), source, fetched-at |
 | `/videos?niche=<slug>` | Pipeline rows: id prefix, status, est. ¢, actual ¢, created |
 | `/review?niche=<slug>` | Only `pending_review` videos with **Approve** / **Reject** buttons |
+| `/stories` | Submit a story (operator-supplied text) → script → video, skipping trends. Niche selector + 10–5000 char textarea. |
 | `/costs?niche=<slug>` | 30-day spend bars + total |
 
 The dashboard is read-only except `/review`. All other writes go through the operator CLI or `make e2e-stub`.
@@ -515,7 +516,7 @@ make worker   # equivalent to: celery -A shortstack_worker.celery_app worker -Q 
 | **Phase 5: Publisher** | ✅ | `Publisher` ABC + `YouTubeShortsPublisher` (OAuth refresh-token → resumable upload). Worker `publish_video(video_id, platform, visibility)` consumes `approved` videos, persists `Publication`, transitions `approved → publishing → published`. Idempotent on `(video_id, platform)`. |
 | **Phase 6: Analytics & feedback** | ✅ | `snapshot_metrics(publication_id)` scheduled at t+24h/72h/7d at publish time, plus nightly catch-up. `weekly_learnings(niche_id)` (Sun 02:00 UTC) reads top vs bottom decile by views-per-cent, Sonnet writes `niches/{id}/learnings_v1.md` to S3. Script-gen system prompt loads it on next run. Dashboard `/metrics` shows views + likes + cost + margin proxy per video. |
 | **Phase 7: Multi-platform** | ✅ | `BufferPublisher` (Buffer Publishing API v2, upload-media → create-update). Per-niche `persona_json.buffer_profiles` maps `Platform.value → profile_id`. `publish_video_all(video_id, platforms)` task fans out sequentially with per-platform error capture (one failure does not abort the others). CLI: `publish all --platforms ig_reels,tiktok,x,linkedin`. |
-| Phase 8: User-story mode | — | `POST /videos/from-story` skips trends |
+| **Phase 8: User-story mode** | ✅ | `POST /videos/from-story` (sync `201 Created`) accepts `{niche_slug, story_text}`. `_generate(...)` extracted from `generate_script` and shared with `generate_script_from_story(niche_id, story_text)`. Dashboard `/stories` page: niche selector + 5000-char textarea + deep-link to the resulting `/videos?niche=<slug>`. |
 | Phase 9: Full automation | — | Cron + auto-approve heuristic |
 
 See `TODO.md` for the live punch-list.
