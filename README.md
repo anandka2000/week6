@@ -11,6 +11,16 @@ trends  →  cluster + score  →  pick  →  script  →  assets  →  render  
 
 ## Quickstart
 
+**Brand-new machine?** One command — installs Docker / uv / Node 22 / pnpm, boots the stack, migrates, seeds, runs tests:
+
+```bash
+make setup
+```
+
+Tested on macOS + Ubuntu 22/24 + Debian 12. Idempotent.
+
+**Already set up?** Manual sequence:
+
 ```bash
 cp .env.example .env       # add ANTHROPIC_API_KEY for real clustering
 make up                    # postgres :5432, redis :6379, minio :9000/:9001

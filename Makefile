@@ -1,4 +1,7 @@
-.PHONY: up down install dev worker beat render render-video publish publish-all snapshot learnings produce publish-approved migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
+.PHONY: setup up down install dev worker beat render render-video publish publish-all snapshot learnings produce publish-approved migrate migrate-revision test fmt lint seed trends-fetch trends-cluster trends-pick assets e2e-stub clean
+
+setup:
+	bash scripts/setup.sh
 
 up:
 	docker compose --env-file .env -f infra/docker-compose.yml up -d

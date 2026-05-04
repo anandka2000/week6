@@ -27,9 +27,21 @@
 
 The fastest path to seeing the pipeline produce something.
 
+### Brand-new machine? One command.
+
+`scripts/setup.sh` (also `make setup`) detects your OS, installs missing prerequisites (Docker, uv, Node 22, pnpm), boots postgres+redis+minio, applies migrations, seeds the first niche, and runs the test suite. Idempotent — safe to re-run.
+
+```bash
+git clone https://github.com/anandka2000/videogen.git shortstack
+cd shortstack
+make setup                                   # everything below, in one go
+```
+
+Tested on macOS (Apple Silicon + Intel) and Ubuntu 22/24 + Debian 12. Picks up missing tools without asking; errors loudly if Docker isn't running. After it finishes, jump to "Real pipeline run" or `make dev`.
+
 ### Zero-key smoke test (no AI, no spend)
 
-Proves the wiring without paying anything. Useful for validating a fresh checkout.
+Run this manually if you skipped `make setup`. Proves the wiring without paying anything.
 
 ```bash
 cp .env.example .env
