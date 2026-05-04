@@ -23,7 +23,7 @@
 | Sandbox repo (where Claude works) | `https://github.com/anandka2000/week6` |
 | Sandbox branch | `claude/shortstack-mvp-plan-CCjGq` |
 | Mirror repo (canonical) | `https://github.com/anandka2000/videogen` (mapped to `main`) |
-| Latest commit on sandbox branch | `<this commit>` (Phase 9 + final QA pass) |
+| Latest commit on sandbox branch | `6bfc7a8` Phase 9 shipped, plus a follow-up fixer commit covering QA9 critical (`include=` registration), pre-loop trends try/except, CLI hardening, cross-field settings validator, and the docs sweep this snapshot tracks |
 | Local clone path on user's laptop | `/Users/anaagarw/shortstack` (Mac); planning a fresh Linux box too |
 
 **Sandbox cannot push to videogen** — local proxy is hard-restricted to week6. The user mirrors from their laptop:
@@ -47,7 +47,8 @@ alias mirror-shortstack='cd /Users/anaagarw/shortstack && \
 
 | Commit | What landed |
 |---|---|
-| `<this>` | Phase 9 — auto-approve heuristic + `daily_pipeline` + `publish_approved` + beat schedule |
+| (this) | fix: QA9 follow-ups — `include=` registers automation + analytics, pre-loop trends try/except, CLI `--max`/`--platform`/`--visibility` validation, settings cross-field validator, README/USER_GUIDE/DECISIONS Phase-9 docs sweep |
+| `6bfc7a8` | Phase 9 — auto-approve heuristic + `daily_pipeline` + `publish_approved` + beat schedule |
 | `991d3df` | fix: QA1 + QA2 findings (CLI hardening, StoryIn whitespace, dashboard 422 parsing) |
 | `33c50e2` | Phase 8 — user-story mode (`POST /videos/from-story` + dashboard /stories) |
 | `413e6cb` | Phase 7 — `BufferPublisher` + `publish_video_all` multi-platform fan-out |

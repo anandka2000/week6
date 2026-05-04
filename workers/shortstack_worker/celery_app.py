@@ -34,6 +34,8 @@ app = Celery(
         "shortstack_worker.tasks.assets",
         "shortstack_worker.tasks.render",
         "shortstack_worker.tasks.publish",
+        "shortstack_worker.tasks.analytics",
+        "shortstack_worker.tasks.automation",
     ],
 )
 
@@ -60,6 +62,9 @@ app.conf.update(
         "shortstack_worker.tasks.render.*": {"queue": Queue.RENDER.value},
         "shortstack_worker.tasks.publish.*": {"queue": Queue.PUBLISH.value},
         "shortstack_worker.tasks.analytics.*": {"queue": Queue.ANALYTICS.value},
+        # Automation orchestrators ride on the analytics queue (low-priority
+        # cron-driven work, never on the user's critical path).
+        "shortstack_worker.tasks.automation.*": {"queue": Queue.ANALYTICS.value},
     },
 )
 

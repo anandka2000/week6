@@ -103,8 +103,30 @@ def daily_pipeline(niche_id: str, max_videos: int | None = None) -> dict[str, An
     )
 
     # 1. Refresh trends (idempotent: source rows have unique constraints).
-    fetch_reddit.run(niche_id)
-    cluster.run(niche_id)
+    # Pre-loop failures degrade gracefully — without this, an Anthropic
+    # outage during cluster() (or a missing API key) would crash the whole
+    # daily run instead of returning a meaningful "skipped" summary.
+    try:
+        fetch_reddit.run(niche_id)
+        cluster.run(niche_id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "daily_pipeline.trends_unavailable",
+            extra={
+                "niche_id": niche_id,
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            },
+        )
+        return {
+            "niche_id": niche_id,
+            "niche_slug": niche_slug,
+            "skipped": True,
+            "reason": f"trends_unavailable: {type(exc).__name__}: {exc}",
+            "today": today_count,
+            "quota": quota,
+            "produced": [],
+        }
 
     produced: list[str] = []
     skipped: list[dict[str, Any]] = []

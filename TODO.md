@@ -17,12 +17,11 @@ follow-ups below are non-blocking polish.
 
 ## Phase 9 leftovers (defer; nice-to-have)
 - [ ] Real audio-loudness check via ffmpeg (currently we only proxy via caption coverage)
-- [ ] Make the auto-approve hold-period configurable (default 1h between auto-approve and auto-publish)
+- [ ] Make the auto-approve hold-period configurable (default 1h between auto-approve and auto-publish, encoded as the gap between the two beat entries)
 - [ ] Surface `failure_reason="auto_review: ..."` text on the dashboard /review page so the operator sees the heuristic's reasons inline
 - [ ] Per-niche thresholds (overriding the env defaults) — useful if some niches need longer / shorter videos
-- [ ] Cron the trend → script → asset → render pipeline to produce N videos/day per niche (`niches.daily_quota`)
-- [ ] Auto-approve heuristic: caption coverage %, audio LUFS range, duration in range
-- [ ] Manual review only for new niches OR after N consecutive flops
+- [ ] Behavioural test that `render_video` actually transitions to APPROVED vs PENDING_REVIEW based on `should_auto_approve` (the existing test only checks the import is wired)
+- [ ] `pick_next` consumes the trend before the rest of the chain runs — if any later step fails, the trend is lost for the day. Either roll back `consumed_at` on chain-failure, or only consume after `render_video` succeeds.
 
 ## Phase 8 — done
 - [x] `_generate(...)` extracted from `generate_script` as the shared Sonnet + persist helper (mode-aware, preserves trend-mode contract)

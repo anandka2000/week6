@@ -231,7 +231,7 @@ Top-level niche columns:
 | Column | Default | What it does |
 |---|---|---|
 | `cost_cap_cents` | 100 | Hard cap per video. Pre-asset estimate above this rejects the script outright. |
-| `daily_quota` | 3 | Target videos/day (Phase 9 honors this; v0 ignores). |
+| `daily_quota` | 3 | Target videos/day for the Phase-9 cron. `daily_pipeline` produces up to `quota − today_count` videos per beat. |
 
 ### Updating a niche
 
@@ -381,6 +381,13 @@ make assets VIDEO=<uuid>     # picks up at scene 3, doesn't redo 0/1/2
 | `make trends-cluster NICHE=<slug>` | run cluster inline |
 | `make trends-pick NICHE=<slug>` | run pick_next inline |
 | `make assets VIDEO=<uuid>` | run generate_assets inline |
+| `make render-video VIDEO=<uuid>` | run render_video inline (calls the render service over HTTP) |
+| `make publish VIDEO=<uuid> [PLATFORM=…] [VISIBILITY=…]` | publish a single approved video to one platform |
+| `make publish-all VIDEO=<uuid> PLATFORMS=ig_reels,tiktok,…` | fan-out to multiple platforms via Buffer |
+| `make snapshot PUBLICATION=<uuid>` | pull latest YouTube stats into `metric_snapshots` |
+| `make learnings NICHE=<slug>` | synthesize this niche's learnings.md (Sonnet) |
+| `make produce NICHE=<slug> [MAX=N]` | Phase-9 daily pipeline: trends → script → assets → render up to quota |
+| `make publish-approved NICHE=<slug> [PLATFORM=…] [VISIBILITY=…]` | fire publish_video for every APPROVED video missing a Publication |
 | `make e2e-stub NICHE=<slug>` | run full pipeline once (adapts to which keys are present) |
 | `make test` | uv run pytest |
 | `make fmt` / `make lint` | ruff |
@@ -404,6 +411,29 @@ scripts
 assets
   generate --video-id <uuid>   visuals (per scene) + tts + captions
                                Idempotent on (script_id, scene_index|kind)
+
+render
+  video    --video-id <uuid>   POST <RENDER_SERVICE_URL>/render with assets,
+                               store mp4 key, transition to APPROVED or
+                               PENDING_REVIEW per the auto-approve heuristic
+
+publish
+  video    --video-id <uuid>             [--platform youtube_shorts] [--visibility unlisted|public]
+  all      --video-id <uuid> --platforms ig_reels,tiktok,x,linkedin
+                               sequential fan-out via Buffer (validates slugs)
+
+analytics
+  snapshot          --publication-id <uuid>   pull latest YouTube stats
+  nightly-catchup                              re-snapshot stale publications
+  learnings         --niche <slug>             Sonnet writes learnings_v1.md to S3
+
+automation
+  daily             --niche <slug> [--max N]   Phase-9 daily pipeline
+                               trends → script → assets → render up to
+                               niches.daily_quota (or --max if smaller)
+  publish-approved  --niche <slug> [--platform …] [--visibility …]
+                               queue publish_video for APPROVED videos
+                               missing a Publication for the platform
 ```
 
 All commands run **inline** (`task.run(...)`) — no celery worker required. For background dispatch, use `task.delay(...)` from a Python REPL or schedule via beat.

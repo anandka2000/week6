@@ -136,6 +136,76 @@ Loaded lazily via `lru_cache`. Cheap enough to run on the worker box
 and ~150MB model footprint. We can swap to `small.en` if accuracy
 matters, or to GPU if throughput becomes a problem. No need yet.
 
+## 2026-05-02 — Phase 9 (full automation)
+
+### Auto-approve gate lives in `render_video`, not in a separate task
+After a successful render, the worker computes the auto-approve decision
+inline before flipping status. Reasons: (a) the render task already has
+the captions + cost + duration in scope, no extra DB hit; (b) one place
+to change the rule of "what gets human review"; (c) if the gate fires,
+the next-step pipeline (publish) just doesn't see the video — no
+special handling needed.
+
+### Heuristic checks (in order of how often they'll fire)
+1. **Duration in `[15s, 60s]`** — outside this band YouTube Shorts deprioritises.
+2. **Caption coverage `≥ 1.0` words/sec** — proxy for "the audio actually has narration the captions sync to."
+3. **Cost under sanity ceiling (200¢)** — defence-in-depth on rolling cost-cap rounding bugs.
+4. **Niche not on flop streak** — last N (default 3) published videos all under threshold (default 100 views).
+
+Audio loudness (LUFS) is in the kickoff brief but skipped in v0; would
+need ffmpeg analysis. Caption coverage is a serviceable proxy until we
+have a real loudness check. Tracked in TODO.
+
+### Held-for-review reason stuffed into `videos.failure_reason`
+The column is named for failure but the data type and dashboard
+treatment fit the auto-review-reasons use case. We prefix with
+`"auto_review: "` so the dashboard can distinguish "real failure"
+from "held for review" if it wants. Skipping a schema migration for v0.
+
+### `daily_pipeline` runs sequentially per niche, niches in parallel
+Beat-fired `daily_pipeline_all` enqueues one `daily_pipeline` task per
+niche. Each niche's chain is sequential (`fetch → cluster → for each
+quota slot: pick → script → assets → render`) but different niches run
+on different workers. Trade-off: simpler bookkeeping at the cost of
+not parallelising scenes within a video. The bottleneck is render
+(10–60s) so per-niche parallelism is plenty.
+
+### Pre-loop trends failures fail-soft, per-slot failures fail-soft
+If `cluster()` raises (e.g. Anthropic outage, missing API key), the
+whole `daily_pipeline` returns a `skipped="trends_unavailable"` summary
+instead of crashing — symmetric with the per-slot `try/except` that
+already kept other slots running when one video failed. Without this
+catch the QA9 finding would manifest as silently-broken nightly cron
+on any day Anthropic has a hiccup.
+
+### `publish_approved_all` runs 1h *after* `daily_pipeline_all`
+10:00 UTC → produce videos. 11:00 UTC → publish anything that survived
+the auto-approve gate. The 1h gap is the operator's window to flip
+auto-approved-but-actually-bad videos to FAILED via the dashboard
+`/review` page. **Note:** the gap is per-niche-start, not per-video — a
+niche whose pipeline finishes at 10:55 leaves the operator only ~5
+minutes. Tunable via beat config; tracked as a leftover.
+
+### Automation tasks route to the analytics queue
+We didn't add a dedicated automation queue — the orchestrators are
+low-priority cron work and the analytics queue already runs at a
+cadence that suits them. Trade-off: noisy neighbours (a slow
+`weekly_learnings` could delay `daily_pipeline_all`); we'll split the
+queue if that ever bites.
+
+### `AutoApproveDecision` is a frozen dataclass
+Operator code that receives one cannot accidentally mutate the reasons
+list. Pure-function semantics; trivially testable; matches the
+"transient values, no hidden state" convention we've used for cost
+and quality calculations elsewhere.
+
+### Settings cross-validation: `min_duration ≤ max_duration`
+A `model_validator(mode="after")` rejects a Settings instance where
+the auto-approve duration window is inverted. Without this, swapping
+`AUTO_APPROVE_MIN_DURATION_SEC` and `AUTO_APPROVE_MAX_DURATION_SEC`
+in `.env` would silently hold every render at pending_review with no
+obvious cause.
+
 ## 2026-05-02 — Phase 8 (user-story mode)
 
 ### `_generate(...)` is the shared persist path; `generate_script` is a thin wrapper

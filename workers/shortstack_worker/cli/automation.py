@@ -8,6 +8,7 @@ import typer
 from sqlalchemy import select
 
 from shortstack_core.db import Niche, session_scope
+from shortstack_core.enums import Platform
 
 from ..tasks import automation as automation_tasks
 
@@ -26,7 +27,7 @@ def _niche_id_by_slug(slug: str) -> str:
 def daily(
     niche: str = typer.Option(..., help="niche slug"),
     max_videos: int | None = typer.Option(
-        None, "--max", help="cap below niche.daily_quota for this run"
+        None, "--max", help="cap below niche.daily_quota for this run", min=0
     ),
 ) -> None:
     """Run today's pipeline for a niche: trends → script → assets → render
@@ -46,6 +47,17 @@ def publish_approved_cmd(
 ) -> None:
     """Queue publish_video for every APPROVED video in this niche that
     doesn't yet have a Publication for the target platform."""
+    valid = {p.value for p in Platform}
+    if platform not in valid:
+        raise typer.BadParameter(
+            f"unknown platform slug: {platform}. valid: {', '.join(sorted(valid))}",
+            param_hint="--platform",
+        )
+    if visibility not in {"unlisted", "public"}:
+        raise typer.BadParameter(
+            f"visibility must be 'unlisted' or 'public', got {visibility!r}",
+            param_hint="--visibility",
+        )
     result = automation_tasks.publish_approved.run(
         _niche_id_by_slug(niche), platform, visibility
     )

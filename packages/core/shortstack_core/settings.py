@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -76,6 +76,18 @@ class Settings(BaseSettings):
     auto_approve_max_cost_cents: int = Field(default=200, ge=1)
     auto_approve_flop_threshold_views: int = Field(default=100, ge=0)
     auto_approve_flop_streak: int = Field(default=3, ge=1)
+
+    @model_validator(mode="after")
+    def _auto_approve_duration_window_consistent(self) -> Settings:
+        """Reject min > max so every video doesn't silently trip the duration
+        gate. Without this check a typo (env vars swapped) would hold
+        every render at pending_review with no obvious cause."""
+        if self.auto_approve_min_duration_sec > self.auto_approve_max_duration_sec:
+            raise ValueError(
+                f"AUTO_APPROVE_MIN_DURATION_SEC ({self.auto_approve_min_duration_sec}) "
+                f"> AUTO_APPROVE_MAX_DURATION_SEC ({self.auto_approve_max_duration_sec})"
+            )
+        return self
 
 
 _settings: Settings | None = None

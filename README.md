@@ -102,8 +102,14 @@ Tests use respx to mock Reddit + Anthropic; no API keys or network needed.
 | Day 7: Polish | done |  |
 | **Phase 2: Script gen** | done | Sonnet 4.6, reprompt loop, scene-0 hook constraint, CTA rewrite |
 | **Phase 3: Assets** | done | Pexels-first / Flux-fallback (Haiku grader), ElevenLabs Turbo, faster-whisper word timings, rolling cost cap |
+| **Phase 4: Render** | done | Remotion 1080×1920 with Ken Burns, word-level captions, fade-in CTA. POST /render uploads mp4 to S3 |
+| **Phase 5: Publisher** | done | YouTube Shorts via OAuth refresh-token + resumable upload; idempotent `(video_id, platform)` |
+| **Phase 6: Analytics + feedback** | done | Snapshots at t+24/72h/7d, weekly Sonnet `learnings.md` feeds back into script-gen |
+| **Phase 7: Multi-platform** | done | `BufferPublisher` + `publish_video_all` fan-out for IG/TikTok/X/LinkedIn |
+| **Phase 8: User-story mode** | done | `POST /videos/from-story` skips trends; dashboard `/stories` form |
+| **Phase 9: Full automation** | done | `should_auto_approve` heuristic in `render_video`; `daily_pipeline_all` (10 UTC) + `publish_approved_all` (11 UTC) beat |
 
-Next up: **Phase 4 — Remotion render service**. Tracked in TODO.md.
+All 9 kickoff phases shipped. See `TODO.md` for the polish backlog (live Buffer-shape verification, ffmpeg LUFS, dashboard surfacing of held-for-review reasons, per-niche threshold overrides).
 
 ## Per-asset pipeline (Phase 3)
 
