@@ -36,10 +36,10 @@ render:
 	cd apps/render && pnpm dev
 
 migrate:
-	cd infra && uv run alembic upgrade head
+	uv run alembic -c infra/alembic.ini upgrade head
 
 migrate-revision:
-	cd infra && uv run alembic revision --autogenerate -m "$(m)"
+	uv run alembic -c infra/alembic.ini revision --autogenerate -m "$(m)"
 
 test:
 	uv run pytest
