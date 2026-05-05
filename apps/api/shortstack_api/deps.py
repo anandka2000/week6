@@ -19,10 +19,17 @@ def get_db() -> Iterator[Session]:
         db.close()
 
 
-def get_niche_by_slug(slug: str, db: Session = Depends(get_db)) -> Niche:
-    niche = db.query(Niche).filter(Niche.slug == slug).one_or_none()
-    if niche is None:
+def get_niche_by_slug(niche: str, db: Session = Depends(get_db)) -> Niche:
+    """Resolve a niche by its slug. The query parameter is named ``niche``
+    (not ``slug``) because that's what the dashboard's fetch helpers send;
+    keeping them aligned avoids 422 'field required' errors at the dashboard
+    boundary. The function name still reads ``by_slug`` because it looks up
+    the row via ``Niche.slug``.
+    """
+    n = db.query(Niche).filter(Niche.slug == niche).one_or_none()
+    if n is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"niche '{slug}' not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"niche '{niche}' not found",
         )
-    return niche
+    return n
