@@ -28,6 +28,7 @@ from sqlalchemy import select, update
 from shortstack_core.db import Niche, Script, Trend, Video, session_scope
 from shortstack_core.enums import ScriptMode, ScriptStatus, VideoStatus
 from shortstack_core.schemas import VOICE_ID_PLACEHOLDER, NichePersona, Scene, ScriptDraft
+from shortstack_core.settings import get_settings
 from shortstack_worker.tasks import assets as asset_tasks
 from shortstack_worker.tasks import render as render_tasks
 from shortstack_worker.tasks import scripts as script_tasks
@@ -85,7 +86,12 @@ def main() -> int:
     fetched = trend_tasks.fetch_reddit.run(niche_id)
     print(f"      wrote {fetched['written']} new trend rows")
 
-    have_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    # Settings is the single source of truth for keys — pydantic-settings
+    # reads .env so editing the file alone is enough; no need to `export`
+    # or `set -a` before `make e2e-stub`. ``os.environ`` only sees keys
+    # that the calling shell explicitly exported.
+    settings = get_settings()
+    have_anthropic = bool(settings.anthropic_api_key)
     if have_anthropic:
         print("[2/5] cluster (Haiku)")
         trend_tasks.cluster.run(niche_id)
@@ -149,9 +155,10 @@ def main() -> int:
             print(f"      video_id={video_id}")
 
     # Phase 3 assets requires several API keys + a real voice_id; skip if any missing.
-    have_assets_keys = all(
-        os.environ.get(k)
-        for k in ("ELEVENLABS_API_KEY", "PEXELS_API_KEY", "REPLICATE_API_TOKEN")
+    have_assets_keys = bool(
+        settings.elevenlabs_api_key
+        and settings.pexels_api_key
+        and settings.replicate_api_token
     )
     voice_id_set = False
     with session_scope() as s:
