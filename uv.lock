@@ -1349,6 +1349,12 @@ wheels = [
 name = "shortstack"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "shortstack-api" },
+    { name = "shortstack-core" },
+    { name = "shortstack-publishers" },
+    { name = "shortstack-worker" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1359,6 +1365,12 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "shortstack-api", editable = "apps/api" },
+    { name = "shortstack-core", editable = "packages/core" },
+    { name = "shortstack-publishers", editable = "packages/publishers" },
+    { name = "shortstack-worker", editable = "workers" },
+]
 
 [package.metadata.requires-dev]
 dev = [

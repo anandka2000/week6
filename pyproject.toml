@@ -3,6 +3,17 @@ name = "shortstack"
 version = "0.1.0"
 description = "AI short-video pipeline (Trending Tech)"
 requires-python = ">=3.11"
+# Root project pulls every workspace member in as a dep so `uv sync` at the
+# repo root installs them all in editable mode. Without these, members get
+# resolved transitively only when something else depends on them — and the
+# CLI/test suite/render etc. all live in `workers` which nothing else
+# depends on, so it'd silently not install. Hit on a fresh Ubuntu setup.
+dependencies = [
+    "shortstack-api",
+    "shortstack-core",
+    "shortstack-publishers",
+    "shortstack-worker",
+]
 
 [tool.uv.workspace]
 members = [
@@ -13,8 +24,10 @@ members = [
 ]
 
 [tool.uv.sources]
+shortstack-api = { workspace = true }
 shortstack-core = { workspace = true }
 shortstack-publishers = { workspace = true }
+shortstack-worker = { workspace = true }
 
 [dependency-groups]
 dev = [
