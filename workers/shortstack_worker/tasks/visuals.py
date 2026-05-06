@@ -115,6 +115,7 @@ def _select_provider_for_scene(
     scene_index: int,
     pexels_search,
     relevance_grader,
+    flux_available: bool = True,
 ) -> tuple[str, list[pexels.PexelsPhoto], int | None, int | None, str]:
     """Pure decision helper. Returns (provider, candidates, chosen_index, score, rationale).
 
@@ -124,20 +125,42 @@ def _select_provider_for_scene(
     ``pexels_search`` and ``relevance_grader`` are dependency-injected
     callables so tests don't need to monkey-patch globals.
     ``relevance_grader`` is invoked as ``(visual_prompt, candidates) -> (best_index, score, rationale)``.
+
+    If ``flux_available`` is False (no Replicate token), every Flux fallback
+    becomes a Pexels fallback instead. Hero scene takes the first Pexels
+    hit unconditionally; non-hero scenes that would have fallen back to
+    Flux take the highest-ranked Pexels candidate (or first one if the
+    grader said best_index is None). This keeps the pipeline running on
+    Pexels-only setups; quality on the hero scene takes a small hit but
+    nothing crashes.
     """
     if _is_hero_scene(scene_index):
-        return ("flux-schnell", [], None, None, "hero scene")
+        if flux_available:
+            return ("flux-schnell", [], None, None, "hero scene")
+        # Pexels-only mode: search for the hero too, take the first hit.
+        candidates = pexels_search(scene.visual_prompt)
+        if candidates:
+            return ("pexels", candidates, 0, None, "hero (pexels-only mode)")
+        # No Pexels results either: nothing we can do.
+        return ("none", [], None, None, "no pexels hits and no flux configured")
 
     candidates = pexels_search(scene.visual_prompt)
     if not candidates:
-        return ("flux-schnell", [], None, None, "no pexels hits")
+        if flux_available:
+            return ("flux-schnell", [], None, None, "no pexels hits")
+        return ("none", [], None, None, "no pexels hits and no flux configured")
 
     best_index, score, rationale = relevance_grader(scene.visual_prompt, candidates)
     if best_index is None:
-        return ("flux-schnell", candidates, None, score, rationale)
+        if flux_available:
+            return ("flux-schnell", candidates, None, score, rationale)
+        # Pexels-only: take the first candidate even though grader didn't like any.
+        return ("pexels", candidates, 0, score, f"{rationale} (pexels-only fallback)")
     if best_index < 0 or best_index >= len(candidates):
         # Defensive: model hallucinated an out-of-range index; fall back.
-        return ("flux-schnell", candidates, None, score, "best_index out of range")
+        if flux_available:
+            return ("flux-schnell", candidates, None, score, "best_index out of range")
+        return ("pexels", candidates, 0, score, "best_index out of range (pexels-only)")
 
     return ("pexels", candidates, best_index, score, rationale)
 
@@ -247,7 +270,14 @@ def generate_scene_visual(
         scene_index=scene_index,
         pexels_search=lambda q: pexels.search_photos(q, per_page=5),
         relevance_grader=_grader,
+        flux_available=bool(get_settings().replicate_api_token),
     )
+    if provider == "none":
+        raise ValueError(
+            f"scene {scene_index}: no Pexels hits for {scene.visual_prompt!r} "
+            "and REPLICATE_API_TOKEN isn't set, so Flux fallback isn't available either. "
+            "Either set REPLICATE_API_TOKEN in .env or rephrase the visual_prompt."
+        )
 
     # 3) Fetch image bytes from the chosen provider.
     fallback_used = provider == "flux-schnell" and not _is_hero_scene(scene_index)

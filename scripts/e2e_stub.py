@@ -154,11 +154,13 @@ def main() -> int:
             video_id = video.id
             print(f"      video_id={video_id}")
 
-    # Phase 3 assets requires several API keys + a real voice_id; skip if any missing.
+    # Phase 3 assets requires ElevenLabs (TTS) + Pexels (visuals) + a real
+    # voice_id. Replicate is OPTIONAL — when absent, the visuals task runs
+    # in Pexels-only mode (hero scene takes the first Pexels hit instead of
+    # Flux). Quality on the hero is slightly lower; nothing crashes.
     have_assets_keys = bool(
         settings.elevenlabs_api_key
         and settings.pexels_api_key
-        and settings.replicate_api_token
     )
     voice_id_set = False
     with session_scope() as s:
@@ -208,8 +210,10 @@ def main() -> int:
             print(f"[6/7] video status={status} — skipping render")
     else:
         # Build a per-key missing list so the operator sees exactly which one
-        # to fix. Lumping the three asset keys together hid which was empty.
+        # to fix. Replicate is optional (Pexels-only mode), so it's reported
+        # as a 'note' instead of blocking.
         missing = []
+        notes = []
         if not have_anthropic:
             missing.append("ANTHROPIC_API_KEY")
         if not settings.elevenlabs_api_key:
@@ -217,11 +221,16 @@ def main() -> int:
         if not settings.pexels_api_key:
             missing.append("PEXELS_API_KEY")
         if not settings.replicate_api_token:
-            missing.append("REPLICATE_API_TOKEN")
+            notes.append(
+                "REPLICATE_API_TOKEN unset — visuals will run in Pexels-only mode "
+                "(hero scene takes first Pexels hit; quality slightly lower)"
+            )
         if not voice_id_set:
             missing.append(
                 "niche.persona_json.voice_id (still the placeholder — UPDATE it via psql)"
             )
+        if notes:
+            print(f"      note: {' | '.join(notes)}")
         print(
             f"[5/5] skipping assets — missing: {', '.join(missing)} "
             "(see docs/USER_GUIDE.md or PROJECT_STATUS.md). Demo flip to pending_review."
