@@ -1,9 +1,31 @@
 # Open questions & follow-ups
 
-## All 9 kickoff phases — done.
+## All 9 kickoff phases — done. `make setup` one-shot installer also done.
 
 Phase status table in `docs/USER_GUIDE.md` is the source of truth. Open
 follow-ups below are non-blocking polish.
+
+## Setup-time gotchas — all fixed in code
+
+These came out of real-machine debugging on macOS + Ubuntu. Each has a
+commit fix; listed here so future operators / sessions know they were
+real and where the recovery lives. Full table in `docs/PROJECT_STATUS.md`
+("Setup-time gotchas" section).
+
+- Node 25 too new for Remotion → `setup.sh` installs Node 22 LTS (`fff5896` baseline)
+- pnpm 11 needs Node 22.13+ → enforced in setup.sh
+- `--env-file` flag rejected by older docker compose → dropped (`9e1eace`)
+- Docker Compose v2 plugin missing on Colima/Podman → auto-detect both forms (`5e6e667`)
+- Corepack `pnpm@latest` fetch fails → multi-step fallback ending in pnpm-9 binary (`437b331`)
+- brew refuses to symlink over Corepack shim → `corepack disable` first (`1668c83`)
+- npmjs.org `%2F` URLs blocked by corp WAF / captive portal → pnpm-9 binary has no runtime fetch (`437b331`)
+- SSL cert verification failure (corp MITM) → operator action: install corp CA + set `NODE_EXTRA_CA_CERTS` etc. (in `DECISIONS.md`)
+- alembic spawn from `infra/` subdir → run from repo root with `-c infra/alembic.ini` (`fff5896`)
+- alembic `Path doesn't exist: migrations` from repo root → use `%(here)s` template (`5d78ac7`)
+- `uv sync` skipped workspace members → root pyproject explicitly depends on all 4 (`8824013`)
+- `/review` 422 from URL/dependency parameter mismatch → renamed `slug` → `niche` in dependency (`4ae875d`)
+- `e2e_stub` saw ".env missing keys" even with `.env` populated → `get_settings()` reads `.env`; `os.environ` doesn't (`cae941f`)
+- Haiku cluster output truncated by `max_tokens=2048` → bigger budget + tighter prompt + smaller batch (`33c38d5`)
 
 ## Phase 9 — done
 - [x] `should_auto_approve(...)` heuristic in `packages/core/shortstack_core/quality.py` (duration, caption coverage, cost ceiling, flop streak)

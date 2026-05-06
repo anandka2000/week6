@@ -2,6 +2,75 @@
 
 Architectural choices we've locked in. Add to this file with date + short rationale whenever a non-obvious tradeoff comes up.
 
+## 2026-05-03 — Setup-time choices (from real-machine debugging)
+
+Captured here so a future session knows "we considered the alternative and chose
+this for a reason." Detailed gotcha table is in `docs/PROJECT_STATUS.md`.
+
+### Node 22 LTS, not 20 or 25
+pnpm 11 (current at install time) uses `node:sqlite` which only exists in
+Node 22.13+. Node 20 too old. Node 25 too new — Remotion 4 expects 20 or
+22 LTS. We pin to 22 in `setup.sh`.
+
+### Auto-detect `docker compose` (v2 plugin) vs `docker-compose` (standalone)
+Colima, Podman, and older Docker installs ship the v1-style standalone
+`docker-compose` binary; modern Docker Desktop ships the v2 plugin. The
+Makefile picks whichever is on PATH (`COMPOSE := $(shell ...)`). Same
+compose file works on both.
+
+### pnpm fallback chain: Corepack → brew/npm → GitHub-released pnpm 9 binary
+Corepack (Node-bundled) is the official path but its first run fetches
+`@pnpm/exe` from npmjs.org. Some networks (corp WAFs, hotel captive
+portals) reject URLs with `%2F` encoded slashes — even though basic
+npmjs.org connectivity works. We fall back to brew/npm install, then
+to a self-contained pnpm 9 binary from GitHub Releases (no runtime
+fetch). Pinning pnpm 9 (last major before the @pnpm/exe split) is
+acceptable because we ship pnpm-lock.yaml already and pnpm 9's lock
+format is forward-compatible.
+
+### `.env` is loaded by pydantic-settings only — never via os.environ
+Every code path that reads API keys uses `shortstack_core.settings.
+get_settings()`, NOT `os.environ.get(...)`. Python doesn't auto-import
+`.env`. Editing `.env` is sufficient for the entire system because
+Settings is the single source of truth. Caught one bug where
+`scripts/e2e_stub.py` was reading `os.environ` directly and ignoring
+`.env` (`cae941f`).
+
+### alembic invoked from repo root, paths in `.ini` use `%(here)s`
+uv's project discovery from a subdirectory doesn't reliably find the
+root workspace's .venv, so the Makefile runs `uv run alembic -c
+infra/alembic.ini ...` from the project root. Alembic resolves
+`script_location` and `prepend_sys_path` relative to **CWD**, not to
+the .ini file. Using the `%(here)s` template makes both paths CWD-
+independent: `script_location = %(here)s/migrations`,
+`prepend_sys_path = %(here)s/../packages/core`.
+
+### uv root project depends on every workspace member explicitly
+The root `pyproject.toml` lists `[tool.uv.workspace]` members AND
+declares them in `dependencies = [...]` with `[tool.uv.sources]`
+`workspace = true` mappings. Without the explicit dependency, `uv
+sync` only installs members that are pulled in transitively, which
+in practice meant the test suite couldn't import `shortstack_worker`
+on a fresh box.
+
+### Cluster: limit input to 50 newest trends, 4096 max_tokens, ≤12-word rationales
+With 100+ trends and verbose Haiku rationales, max_tokens=2048 gets
+truncated mid-stream and the JSON is unrecoverable. Budget calculation:
+50 trends × ~20 tokens of metadata each + 50-trend output × ~50 tokens
+each → ~4000 tokens. Tightening the rationale to ≤12 words cuts the
+output side by ~3×. The ".limit(50)" + sort-by-newest means high-volume
+niches lose nothing — older unscored trends get scored on the next
+`cluster()` call (idempotent).
+
+### `extract_json` salvages prose-wrapped + unclosed-fence responses
+LLMs sometimes prepend "Here you go:" or open a `\`\`\`json` fence and
+get cut off before closing it. extract_json's three-pass strategy:
+(1) try regex-matched fenced block, (2) strip a leading fence and try
+the rest, (3) try the whole stripped text, (4) take substring from
+first `{` to last `}` (or `[` ... `]`) and try. On total failure,
+raises `ValueError` with a 500-char truncated dump of the raw text
+so logs show what the LLM actually returned.
+
 ## 2026-04-26 — Initial decisions
 
 ### Brand
