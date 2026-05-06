@@ -207,14 +207,25 @@ def main() -> int:
                 status = v.status.value if v else "missing"
             print(f"[6/7] video status={status} — skipping render")
     else:
+        # Build a per-key missing list so the operator sees exactly which one
+        # to fix. Lumping the three asset keys together hid which was empty.
         missing = []
         if not have_anthropic:
             missing.append("ANTHROPIC_API_KEY")
-        if not have_assets_keys:
-            missing.append("ELEVENLABS_API_KEY/PEXELS_API_KEY/REPLICATE_API_TOKEN")
+        if not settings.elevenlabs_api_key:
+            missing.append("ELEVENLABS_API_KEY")
+        if not settings.pexels_api_key:
+            missing.append("PEXELS_API_KEY")
+        if not settings.replicate_api_token:
+            missing.append("REPLICATE_API_TOKEN")
         if not voice_id_set:
-            missing.append("voice_id")
-        print(f"[5/5] skipping assets ({', '.join(missing)} missing) — demo flip to pending_review")
+            missing.append(
+                "niche.persona_json.voice_id (still the placeholder — UPDATE it via psql)"
+            )
+        print(
+            f"[5/5] skipping assets — missing: {', '.join(missing)} "
+            "(see docs/USER_GUIDE.md or PROJECT_STATUS.md). Demo flip to pending_review."
+        )
         with session_scope() as s:
             v = s.get(Video, video_id)
             if v is not None and v.status == VideoStatus.PENDING_ASSETS:
