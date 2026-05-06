@@ -62,8 +62,30 @@ def test_extract_json_fenced():
 
 
 def test_extract_json_unfenced_with_prefix():
-    # Pure JSON only — extract_json does not strip prose. Verify it requires fences.
+    """LLMs sometimes prepend prose ('Here you go:'). extract_json now
+    recovers JSON embedded in prose by taking the substring from first
+    `{` to last `}` (or `[`...`]`). Pure-JSON-only behavior was changed
+    in the QA cycle — we'd rather salvage a sloppy response than crash
+    the whole task."""
+    assert extract_json('blah blah {"a": 1}') == {"a": 1}
+    assert extract_json("Here you go: [1, 2, 3] thanks") == [1, 2, 3]
+
+
+def test_extract_json_empty_raises_value_error():
+    """extract_json now raises ValueError (not JSONDecodeError) with the
+    raw text included so logs show what the model actually returned."""
     import pytest
 
-    with pytest.raises(json.JSONDecodeError):
-        extract_json("blah blah {\"a\": 1}")
+    with pytest.raises(ValueError, match="empty"):
+        extract_json("")
+    with pytest.raises(ValueError, match="empty"):
+        extract_json("   \n   ")
+
+
+def test_extract_json_unparseable_raises_value_error_with_context():
+    """Unparseable responses include a truncated copy of the raw text so
+    operators can debug without instrumenting the call site."""
+    import pytest
+
+    with pytest.raises(ValueError, match="no parseable JSON"):
+        extract_json("definitely not json at all")

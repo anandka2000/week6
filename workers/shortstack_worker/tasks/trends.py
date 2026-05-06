@@ -150,7 +150,26 @@ def cluster(niche_id: str) -> dict[str, Any]:
             meta={"prompt_version": CLUSTER_PROMPT_VERSION, "task": "cluster"},
         )
 
-        parsed = extract_json(resp.text)
+        try:
+            parsed = extract_json(resp.text)
+        except ValueError as exc:
+            # Surface the raw response so the operator can see what Haiku said
+            # — celery's autoretry would otherwise re-raise without context.
+            log.error(
+                "cluster.invalid_json",
+                extra={
+                    "niche_id": niche_id,
+                    "input_tokens": resp.usage.input_tokens,
+                    "output_tokens": resp.usage.output_tokens,
+                    "raw_text": resp.text[:1000],
+                },
+            )
+            raise ValueError(
+                f"cluster: Haiku response wasn't parseable JSON. "
+                f"Tokens: in={resp.usage.input_tokens} out={resp.usage.output_tokens}. "
+                f"Raw text (truncated): {resp.text[:300]!r}. "
+                f"Original error: {exc}"
+            ) from exc
         clusters = parsed.get("clusters", [])
 
         clustered = 0

@@ -104,9 +104,56 @@ _JSON_FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
 def extract_json(text: str) -> Any:
-    """Pull a JSON object out of an LLM response, fenced or not."""
-    text = text.strip()
-    m = _JSON_FENCE.search(text)
+    """Pull a JSON object/array out of an LLM response.
+
+    Handles three response shapes in order:
+      1. ```json ... ``` fenced block.
+      2. The whole stripped text is valid JSON.
+      3. JSON object/array embedded in prose ("Here you go: {...}").
+
+    Raises ``ValueError`` on failure with the (truncated) source text so
+    operators can see what the model actually returned. Pure ``json.loads``
+    errors don't carry the response text, which makes debugging Haiku
+    output painful.
+    """
+    if text is None:
+        raise ValueError("LLM response was None")
+    stripped = text.strip()
+    if not stripped:
+        raise ValueError("LLM response text was empty after strip")
+
+    m = _JSON_FENCE.search(stripped)
     if m:
-        return json.loads(m.group(1))
-    return json.loads(text)
+        block = m.group(1)
+        try:
+            return json.loads(block)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"fenced ```json block was not valid JSON: {exc.msg}\n"
+                f"  block (truncated): {block[:300]!r}"
+            ) from exc
+
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    # Prose-wrapped JSON: take the substring from the first `{` (or `[`) to
+    # the matching last `}` (or `]`). Imperfect for nested edge cases but
+    # cheap and recovers from "Sure! Here's the JSON: {...}" responses.
+    candidates: list[str] = []
+    if "{" in stripped and "}" in stripped:
+        candidates.append(stripped[stripped.find("{") : stripped.rfind("}") + 1])
+    if "[" in stripped and "]" in stripped:
+        candidates.append(stripped[stripped.find("[") : stripped.rfind("]") + 1])
+
+    for c in candidates:
+        try:
+            return json.loads(c)
+        except json.JSONDecodeError:
+            continue
+
+    raise ValueError(
+        f"no parseable JSON found in LLM response (length={len(text)} chars). "
+        f"text (truncated): {stripped[:500]!r}"
+    )
