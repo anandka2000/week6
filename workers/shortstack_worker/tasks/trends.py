@@ -104,6 +104,11 @@ def cluster(niche_id: str) -> dict[str, Any]:
         if niche is None:
             raise ValueError(f"niche {niche_id} not found")
 
+        # Cap input per call so the 4096-token output budget fits the response.
+        # 100 trends with verbose rationales overflowed 2048 tokens mid-stream
+        # (Haiku truncated). 50 newest is plenty for "what should I write a
+        # video about today" — older unscored trends get picked up the next
+        # time cluster() runs (idempotent).
         rows = (
             s.execute(
                 select(Trend)
@@ -111,6 +116,8 @@ def cluster(niche_id: str) -> dict[str, Any]:
                 .where(Trend.fetched_at >= cutoff)
                 .where(Trend.consumed_at.is_(None))
                 .where(Trend.cluster_id.is_(None))
+                .order_by(Trend.fetched_at.desc())
+                .limit(50)
             )
             .scalars()
             .all()
@@ -124,7 +131,10 @@ def cluster(niche_id: str) -> dict[str, Any]:
                 "external_id": r.external_id,
                 "source": r.source.value if hasattr(r.source, "value") else r.source,
                 "title": r.title,
-                "summary": (r.summary or "")[:200],
+                # Trim summary tighter: rationales are the variable-cost part of
+                # the response, but big titles/summaries inflate the *input*
+                # which slows everything down.
+                "summary": (r.summary or "")[:120],
             }
             for r in rows
         ]
@@ -136,7 +146,11 @@ def cluster(niche_id: str) -> dict[str, Any]:
             model="claude-haiku-4-5",
             system=system,
             user=user,
-            max_tokens=2048,
+            # 4096 + capped input + tightened rationale length covers 50
+            # trends with headroom. If output ever truncates again the
+            # extract_json error message includes token counts so the
+            # operator can spot the cap immediately.
+            max_tokens=4096,
             cache_system=True,
         )
         record_llm(

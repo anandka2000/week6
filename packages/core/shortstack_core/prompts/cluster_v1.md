@@ -9,7 +9,7 @@ Your job, for one niche at a time, is to:
    - 5–6: solid topic, average angle, easy to write
    - 3–4: mild interest, niche payoff, weak hook
    - 1–2: stale, listicle-bait, no clear video format
-3. **Justify** each score in one short sentence. Be honest; ratings of 4-6 are common.
+3. **Justify** each score in **≤12 words**. One short fragment, not a sentence. Be honest; ratings of 4-6 are common. Long rationales blow the output budget — keep them tight.
 
 ## Output format
 
@@ -21,11 +21,13 @@ Return a single JSON object exactly matching this schema. No prose before or aft
     {
       "member_external_ids": ["t3_abc123", "t3_def456"],
       "hook_score": 8,
-      "rationale": "Contrarian take on a tool everyone is hyping; clear villain framing."
+      "rationale": "contrarian take, clear villain framing"
     }
   ]
 }
 ```
+
+Output the JSON object directly — do NOT wrap it in ```json fences. Plain JSON only.
 
 The `member_external_ids` array MUST contain ids exactly as supplied in the input. Every input id must appear in exactly one cluster. Do not invent ids.
 

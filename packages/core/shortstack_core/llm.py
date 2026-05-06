@@ -133,6 +133,20 @@ def extract_json(text: str) -> Any:
                 f"  block (truncated): {block[:300]!r}"
             ) from exc
 
+    # Unclosed fence: response started with ```json but got cut off before
+    # the closing ``` (typically max_tokens hit). Strip the opening fence
+    # line and any trailing partial fence, then try parsing the rest.
+    if stripped.startswith("```"):
+        nl = stripped.find("\n")
+        if nl != -1:
+            no_fence = stripped[nl + 1 :].rstrip()
+            if no_fence.endswith("```"):
+                no_fence = no_fence[:-3].rstrip()
+            try:
+                return json.loads(no_fence)
+            except json.JSONDecodeError:
+                pass
+
     try:
         return json.loads(stripped)
     except json.JSONDecodeError:
