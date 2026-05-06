@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -41,9 +41,27 @@ class Settings(BaseSettings):
     elevenlabs_model: str = "eleven_turbo_v2_5"
     openai_api_key: str = ""
 
-    # Image gen
-    replicate_api_token: str = ""
-    pexels_api_key: str = ""
+    # Image gen.
+    # Vendor naming is inconsistent (Replicate uses _TOKEN, Pexels uses _KEY,
+    # everyone else uses _API_KEY). Accept the canonical form plus the
+    # likely-typo aliases so a misnamed env var doesn't silently produce
+    # an empty key + a confusing "skipping assets" message.
+    replicate_api_token: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "REPLICATE_API_TOKEN",
+            "REPLICATE_API_KEY",
+            "REPLICATE_TOKEN",
+        ),
+    )
+    pexels_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "PEXELS_API_KEY",
+            "PEXELS_API_TOKEN",
+            "PEXELS_KEY",
+        ),
+    )
     flux_model: str = "black-forest-labs/flux-schnell"
 
     # Trends
