@@ -3,6 +3,14 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var store: SessionStore
 
+    private var dashboardTitle: String {
+        switch store.selectedCountry {
+        case .custom:        return store.profile.name
+        case .unitedKingdom: return "\(store.selectedCountry.flag) United Kingdom"
+        default:             return "\(store.selectedCountry.flag) \(store.profile.name)"
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -122,7 +130,7 @@ struct DashboardView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle(store.profile.name)
+            .navigationTitle(dashboardTitle)
             .navigationBarTitleDisplayMode(.large)
         }
     }

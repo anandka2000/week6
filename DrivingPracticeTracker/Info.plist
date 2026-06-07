@@ -43,7 +43,10 @@
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
 
-    <!-- Privacy — required for voice logging -->
+    <!-- Privacy — required for voice logging and driving detection -->
+    <key>NSMotionUsageDescription</key>
+    <string>Motion and fitness data is used to automatically detect when you are driving so sessions can be logged without opening the app.</string>
+
     <key>NSMicrophoneUsageDescription</key>
     <string>Microphone access is required for voice logging driving sessions. Your audio is processed on-device and never stored.</string>
 

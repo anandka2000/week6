@@ -78,6 +78,10 @@ struct LogDrivingSessionIntent: AppIntent {
         if isHighway  { conditions.append(.highway) }
         if isRaining  { conditions.append(.rain) }
 
+        // Ask Siri to confirm before writing data — this enables voice "yes/no" responses.
+        let confirmText = "Log \(durationMinutes) minutes of \(isNight ? "night " : "")driving\(supervisor.map { " with \($0)" } ?? "")?"
+        try await requestConfirmation(result: .result(dialog: IntentDialog(stringLiteral: confirmText)))
+
         let session = DrivingSession(
             durationMinutes: durationMinutes,
             conditions: conditions,

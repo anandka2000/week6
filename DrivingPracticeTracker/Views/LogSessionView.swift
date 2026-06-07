@@ -12,11 +12,30 @@ struct LogSessionView: View {
     @State private var notes = ""
     @State private var showingVoiceLog = false
     @State private var showingConfirmation = false
+    @State private var showDetectedBanner = false
 
     private var totalMinutes: Int { durationHours * 60 + durationMinutes }
 
     var body: some View {
         NavigationStack {
+            // Auto-detected session banner
+            if showDetectedBanner {
+                HStack(spacing: 10) {
+                    Image(systemName: "car.fill")
+                    Text("Drive auto-detected — review and save")
+                        .font(.subheadline.bold())
+                    Spacer()
+                    Button { showDetectedBanner = false } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color.blue.opacity(0.1))
+                .foregroundStyle(.blue)
+            }
+
             Form {
                 Section("Session Details") {
                     DatePicker("Date & Time", selection: $date, displayedComponents: [.date, .hourAndMinute])
@@ -105,6 +124,15 @@ struct LogSessionView: View {
                 Button("OK") { }
             } message: {
                 Text("Your \(totalMinutes < 60 ? "\(totalMinutes)min" : String(format: "%.1fh", Double(totalMinutes)/60)) drive has been logged.")
+            }
+            .onAppear {
+                // Pre-fill form if a drive was auto-detected while the app was closed
+                if let pending = DrivingDetectionManager.consumePendingSession() {
+                    date            = pending.startTime
+                    durationHours   = pending.durationMinutes / 60
+                    durationMinutes = (pending.durationMinutes % 60 / 5) * 5
+                    showDetectedBanner = true
+                }
             }
         }
     }
