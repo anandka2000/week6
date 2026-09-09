@@ -23,7 +23,7 @@
 | Sandbox repo (where Claude works) | `https://github.com/anandka2000/week6` |
 | Sandbox branch | `claude/shortstack-mvp-plan-CCjGq` |
 | Mirror repo (canonical) | `https://github.com/anandka2000/videogen` (mapped to `main`) |
-| Latest commit on sandbox branch | `33c38d5` (cluster max-tokens + tighter prompt) |
+| Latest commit on sandbox branch | `1806a95` (cross-machine dashboard fix + Makefile `require` macro) |
 | Test count | 166 passing |
 | Local clones | macOS: `/Users/anaagarw/shortstack`; Ubuntu: `~/shortstack` (active dev box) |
 
@@ -46,6 +46,10 @@ Equivalent for the Ubuntu box at `~/shortstack`.
 
 | Commit | What landed |
 |---|---|
+| `1806a95` | dashboard client-side calls derive API base from `window.location` (cross-machine `/review` Approve); Makefile `require` macro fails fast on missing VIDEO/NICHE/etc. |
+| `e9e3c58` | REPLICATE_API_TOKEN optional — visuals task falls back to Pexels-only when unset |
+| `f6bb36a` | Settings accepts common typo aliases for Pexels + Replicate keys |
+| `a9f27e0` | e2e_stub lists each missing key individually + clearer voice_id hint |
 | `33c38d5` | cluster task: bigger token budget (4096), tighter prompt (≤12-word rationale, no fences), input cap (50 newest trends) |
 | `69ef902` | extract_json salvages prose-wrapped JSON; cluster surfaces raw response on parse failure |
 | `cae941f` | e2e_stub reads keys via Settings, not os.environ (the .env wasn't being seen) |
@@ -112,7 +116,7 @@ Equivalent for the Ubuntu box at `~/shortstack`.
 ```
 trends → cluster → pick → script (uses learnings.md) → assets → render → APPROVE → publish → snapshots → weekly_learnings ──┐
                             ↑                                                                                                │
-                            └────────────────────────────────────────────────────────────────────────────────────────────────┘
+                            └─────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                           (closed feedback loop)
 ```
 
@@ -173,6 +177,8 @@ These are the issues the user actually hit during fresh-machine setup. Each has 
 | 11 | `/review` shows "Failed to load: GET /videos -> 422" | `get_niche_by_slug(slug: str, ...)` expected `?slug=...` but dashboard sent `?niche=...` | Renamed dependency parameter `slug` → `niche` (`4ae875d`). Affected `/trends`, `/videos`, `/metrics`, `/costs/daily` too — all silently empty before the fix. |
 | 12 | `make e2e-stub` says "ANTHROPIC_API_KEY missing" even after editing `.env` | Script used `os.environ.get(...)` but `.env` is loaded only by `pydantic-settings` into the `Settings` object | Switched to `get_settings()` (`cae941f`). All other code already used Settings; e2e_stub was the odd one out. |
 | 13 | cluster step fails with `Expecting value: line 1 column 1 (char 0)` then with `no parseable JSON` | Haiku response truncated mid-JSON because output hit `max_tokens=2048` (Haiku wrote verbose 50-word rationales for 100 trends) | Bigger budget (4096), input cap (50 newest), prompt: rationale ≤12 words + no `\`\`\`json` fences (`33c38d5`). Plus extract_json now salvages prose-wrapped + unclosed-fence cases (`69ef902`). |
+| 14 | `/review` Approve button fails with `TypeError: Failed to fetch` when the dashboard is accessed from another machine (e.g. MacBook → `http://anand-ubu:3000`) | Client-side `fetch()` used a compile-time `API_BASE` hardcoded to `localhost:8000`; from the browser that resolves to *the browser's* machine, not the dashboard host | New `apps/dashboard/app/lib/browser.ts::clientApiBase()` derives base at click-time from `window.location.hostname` + port 8000. `ReviewActions.tsx` and `submitStory()` in `lib/api.ts` both use it. `NEXT_PUBLIC_API_URL` still wins if set. |
+| 15 | `make publish` with empty `VIDEO=` argument reports `Got unexpected extra argument (youtube_shorts)` — the empty value shifts positional args by one | Make happily expanded `$(VIDEO)` to the empty string and typer received `--platform` in its slot | Makefile `require` macro (`$(call require,VIDEO)`) that fails fast with `VIDEO is required — e.g. 'make publish VIDEO=<value>'`. Applied to `assets`, `render-video`, `publish`, `publish-all`, `snapshot`, `learnings`, `produce`, `publish-approved`. |
 
 ---
 
@@ -242,7 +248,7 @@ A/B testing per niche, multi-template render variants, music tracks under voiceo
 - Document the npmjs `%2F` MITM/firewall scenario more visibly in `docs/USER_GUIDE.md` troubleshooting (currently in `DECISIONS.md` only).
 
 ### Infra
-- CI: pytest + ruff + tsc on PR (the test suite is fast — 166 tests in ~3s).
+- CI: pytest + ruff + tsc on PR (the test suite is fast —  166 tests in ~3s).
 - Decide MinIO → Cloudflare R2 cutover.
 - Postgres backup strategy.
 
