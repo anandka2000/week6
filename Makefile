@@ -62,28 +62,43 @@ trends-cluster:
 trends-pick:
 	uv run python -m shortstack_worker.cli trends pick --niche $(NICHE)
 
+# Require-var helper. Usage:  $(call require,VIDEO)
+# Fails loudly with a clear message if $(VIDEO) is empty, instead of silently
+# expanding to a broken CLI line (typer then reports 'Got unexpected extra
+# argument' from the value AFTER the empty one, which is confusing).
+require = $(if $($(1)),,$(error $(1) is required — e.g. 'make $@ $(1)=<value>'))
+
 assets:
+	$(call require,VIDEO)
 	uv run python -m shortstack_worker.cli assets generate --video-id $(VIDEO)
 
 render-video:
+	$(call require,VIDEO)
 	uv run python -m shortstack_worker.cli render video --video-id $(VIDEO)
 
 publish:
+	$(call require,VIDEO)
 	uv run python -m shortstack_worker.cli publish video --video-id $(VIDEO) --platform $(if $(PLATFORM),$(PLATFORM),youtube_shorts) --visibility $(if $(VISIBILITY),$(VISIBILITY),unlisted)
 
 publish-all:
+	$(call require,VIDEO)
+	$(call require,PLATFORMS)
 	uv run python -m shortstack_worker.cli publish all --video-id $(VIDEO) --platforms $(PLATFORMS) --visibility $(if $(VISIBILITY),$(VISIBILITY),unlisted)
 
 snapshot:
+	$(call require,PUBLICATION)
 	uv run python -m shortstack_worker.cli analytics snapshot --publication-id $(PUBLICATION)
 
 learnings:
+	$(call require,NICHE)
 	uv run python -m shortstack_worker.cli analytics learnings --niche $(NICHE)
 
 produce:
+	$(call require,NICHE)
 	uv run python -m shortstack_worker.cli automation daily --niche $(NICHE) $(if $(MAX),--max $(MAX),)
 
 publish-approved:
+	$(call require,NICHE)
 	uv run python -m shortstack_worker.cli automation publish-approved --niche $(NICHE) $(if $(PLATFORM),--platform $(PLATFORM),) $(if $(VISIBILITY),--visibility $(VISIBILITY),)
 
 NICHE ?= ai-productivity

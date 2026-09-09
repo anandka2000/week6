@@ -1,3 +1,9 @@
+import { clientApiBase } from "./browser";
+
+// Server-side base: this file is imported by server components (page.tsx) whose
+// fetches run on the same host as the API, so localhost is safe there. Client-
+// side callers (StoryForm etc.) must go through clientApiBase() so a browser
+// on a *different* machine hits the API by its real hostname — see browser.ts.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function get<T>(path: string): Promise<T> {
@@ -111,7 +117,10 @@ export async function submitStory(
   nicheSlug: string,
   storyText: string,
 ): Promise<StoryAccepted> {
-  const res = await fetch(`${API_BASE}/videos/from-story`, {
+  // Runs in the browser (StoryForm is a client component), so derive the API
+  // base from window.location — a MacBook hitting http://anand-ubu:3000 must
+  // POST to http://anand-ubu:8000, not http://localhost:8000.
+  const res = await fetch(`${clientApiBase()}/videos/from-story`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ niche_slug: nicheSlug, story_text: storyText }),

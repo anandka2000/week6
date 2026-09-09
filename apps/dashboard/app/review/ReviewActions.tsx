@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { clientApiBase } from "../lib/browser";
 
 type Decision = "approve" | "reject";
 
@@ -14,7 +14,10 @@ export function ReviewActions({ videoId }: { videoId: string }) {
 
   async function decide(d: Decision) {
     setError(null);
-    const res = await fetch(`${API_BASE}/videos/${videoId}/${d}`, {
+    // Resolve API_BASE at click-time (not module-load) so the browser's
+    // window.location is available. This is what lets an operator on a
+    // MacBook hit the dashboard on anand-ubu without hard-coding a URL.
+    const res = await fetch(`${clientApiBase()}/videos/${videoId}/${d}`, {
       method: "POST",
     });
     if (!res.ok) {
