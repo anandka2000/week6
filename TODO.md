@@ -26,6 +26,8 @@ real and where the recovery lives. Full table in `docs/PROJECT_STATUS.md`
 - `/review` 422 from URL/dependency parameter mismatch → renamed `slug` → `niche` in dependency (`4ae875d`)
 - `e2e_stub` saw ".env missing keys" even with `.env` populated → `get_settings()` reads `.env`; `os.environ` doesn't (`cae941f`)
 - Haiku cluster output truncated by `max_tokens=2048` → bigger budget + tighter prompt + smaller batch (`33c38d5`)
+- Cross-machine dashboard Approve → `TypeError: Failed to fetch` because `API_BASE` was hardcoded to `localhost:8000` in client bundle → new `clientApiBase()` derives from `window.location.hostname` at click-time; `ReviewActions.tsx` + `submitStory()` use it
+- `make publish` with empty `VIDEO=` reported confusing typer error (`Got unexpected extra argument`) → Makefile `require` macro fails fast with `VIDEO is required — e.g. 'make publish VIDEO=<value>'` (applied to every required-arg target)
 
 ## Phase 9 — done
 - [x] `should_auto_approve(...)` heuristic in `packages/core/shortstack_core/quality.py` (duration, caption coverage, cost ceiling, flop streak)
