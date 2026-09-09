@@ -485,6 +485,8 @@ The dashboard is read-only except `/review`. All other writes go through the ope
 | Replicate prediction stuck `starting` for >30s | model warm-up | timeout returns; task retries up to 3× |
 | Whisper takes 60s+ for a 30s clip | first run loads `base.en` model (~150MB) | warmed in `lru_cache`, subsequent runs are fast |
 | Worker prints "no module named shortstack_worker.tasks.assets" | added a task but didn't update `celery_app.py include=` | add it |
+| Dashboard Approve button on another machine shows `TypeError: Failed to fetch` | client-side JS was resolving the API to `localhost:8000` in the *browser*, which is the browser's own machine, not the dashboard host | Already fixed. Client calls now derive the API base from `window.location.hostname` + port 8000 at click-time. If you need to override (e.g. API on a different port/host), set `NEXT_PUBLIC_API_URL=http://host:port` in the dashboard's env before `pnpm dev`. |
+| `make publish` fails with `Got unexpected extra argument (youtube_shorts)` | `VIDEO=` was omitted so the CLI got shifted arguments | Already fixed — Makefile now fails fast with `VIDEO is required — e.g. 'make publish VIDEO=<uuid>'`. Run `make publish VIDEO=<uuid>`. |
 
 ---
 
